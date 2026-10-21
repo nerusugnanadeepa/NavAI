@@ -78,7 +78,9 @@ export class SimulationController {
     this.listeners = new Set();
     this.engineDelegate = null; // Agent 2 attaches here
     this.movementTimer = null;
+    this.replanTimeout = null;
     this.currentWaypointIndex = 0;
+    this.cumulativeDistance = 0;
   }
 
   attachEngine(delegate) {
@@ -126,19 +128,25 @@ export class SimulationController {
       clearInterval(this.movementTimer);
       this.movementTimer = null;
     }
+    if (this.replanTimeout) {
+      clearTimeout(this.replanTimeout);
+      this.replanTimeout = null;
+    }
+
+    this.cumulativeDistance = 0;
 
     const route = this.generatePath(this.state.robotPosition.grid, dest.gridPos, this.state.obstacles);
 
     this.setState({
       currentDestination: dest,
       status: 'idle',
-      activeRoute: route,
+      activeRoute: route || [],
       progressPercent: 0,
       isObstacleDetected: false,
       stats: {
         ...this.state.stats,
-        totalWaypoints: route.length,
-        waypointsRemaining: route.length,
+        totalWaypoints: route ? route.length : 0,
+        waypointsRemaining: route ? route.length : 0,
         distanceTraveled: 0
       }
     });
@@ -199,6 +207,10 @@ export class SimulationController {
       clearInterval(this.movementTimer);
       this.movementTimer = null;
     }
+    if (this.replanTimeout) {
+      clearTimeout(this.replanTimeout);
+      this.replanTimeout = null;
+    }
 
     this.setState({ status: 'paused' });
 
@@ -223,8 +235,13 @@ export class SimulationController {
       clearInterval(this.movementTimer);
       this.movementTimer = null;
     }
+    if (this.replanTimeout) {
+      clearTimeout(this.replanTimeout);
+      this.replanTimeout = null;
+    }
 
     this.currentWaypointIndex = 0;
+    this.cumulativeDistance = 0;
     this.setState({
       status: 'idle',
       currentDestination: null,
@@ -247,14 +264,20 @@ export class SimulationController {
   }
 
   addObstacle(position = null) {
+    const currentDest = this.state.currentDestination;
+    const targetX = currentDest ? currentDest.gridPos.x : 16;
+    const targetY = currentDest ? currentDest.gridPos.y : 16;
+    const spawnedGridX = Math.min(19, Math.max(1, Math.round(
+      this.state.robotPosition.grid.x + (targetX - this.state.robotPosition.grid.x) * 0.5
+    )));
+    const spawnedGridY = Math.min(19, Math.max(1, Math.round(
+      this.state.robotPosition.grid.y + (targetY - this.state.robotPosition.grid.y) * 0.5
+    )));
     const newObstacle = position || {
       id: `obs-${Date.now()}`,
-      grid: { 
-        x: Math.round(this.state.robotPosition.grid.x + (this.state.currentDestination?.gridPos.x - this.state.robotPosition.grid.x) * 0.5), 
-        y: Math.round(this.state.robotPosition.grid.y + (this.state.currentDestination?.gridPos.y - this.state.robotPosition.grid.y) * 0.5) 
-      },
-      world: { x: 2, y: 0, z: -2 },
-      label: 'Simulated Hazard Cone'
+      grid: { x: spawnedGridX, y: spawnedGridY },
+      world: { x: spawnedGridX - 10, y: 0, z: spawnedGridY - 10 },
+      label: `Simulated Hazard [${spawnedGridX}, ${spawnedGridY}]`
     };
 
     const updatedObstacles = [...this.state.obstacles, newObstacle];
@@ -335,9 +358,13 @@ export class SimulationController {
       if (!route || route.length === 0 || this.currentWaypointIndex >= route.length) {
         clearInterval(this.movementTimer);
         this.movementTimer = null;
+        const lastWaypoint = route && route.length > 0 ? route[route.length - 1]?.grid : null;
+        const isAtGoal = Boolean(lastWaypoint && this.state.currentDestination &&
+          lastWaypoint.x === this.state.currentDestination.gridPos.x &&
+          lastWaypoint.y === this.state.currentDestination.gridPos.y);
         this.setState({
-          status: 'arrived',
-          progressPercent: 100,
+          status: isAtGoal ? 'arrived' : 'no_route',
+          progressPercent: isAtGoal ? 100 : this.state.progressPercent,
           stats: {
             ...this.state.stats,
             waypointsRemaining: 0
@@ -350,17 +377,25 @@ export class SimulationController {
       const remaining = route.length - this.currentWaypointIndex - 1;
       const progress = ((this.currentWaypointIndex + 1) / route.length) * 100;
 
+      const dx = nextWaypoint.grid.x - this.state.robotPosition.grid.x;
+      const dy = nextWaypoint.grid.y - this.state.robotPosition.grid.y;
+      const headingDeg = (dx !== 0 || dy !== 0)
+        ? ((Math.atan2(dy, dx) * 180 / Math.PI) + 90)
+        : (this.state.robotPosition.heading || 0);
+
+      this.cumulativeDistance += 1.2;
+
       this.setState({
         robotPosition: {
           grid: nextWaypoint.grid,
           world: { x: nextWaypoint.grid.x - 10, y: 0, z: nextWaypoint.grid.y - 10 },
-          heading: 0
+          heading: headingDeg
         },
         progressPercent: progress,
         stats: {
           ...this.state.stats,
           waypointsRemaining: remaining,
-          distanceTraveled: ((this.currentWaypointIndex + 1) * 1.2).toFixed(1)
+          distanceTraveled: this.cumulativeDistance.toFixed(1)
         }
       });
 
@@ -387,8 +422,15 @@ export class SimulationController {
         isObstacleDetected: true
       });
 
+      if (this.replanTimeout) {
+        clearTimeout(this.replanTimeout);
+        this.replanTimeout = null;
+      }
+
       // Recalculate detour
-      setTimeout(() => {
+      this.replanTimeout = setTimeout(() => {
+        this.replanTimeout = null;
+
         const detour = this.generatePath(
           this.state.robotPosition.grid,
           this.state.currentDestination.gridPos,
@@ -423,58 +465,39 @@ export class SimulationController {
   // Pathfinding algorithm generating collision-free waypoints
   generatePath(start, goal, obstacles) {
     const isBlocked = (gx, gy) => {
-      return obstacles.some(obs => Math.hypot(obs.grid.x - gx, obs.grid.y - gy) < 1.4);
+      if (gx < 0 || gx > 20 || gy < 0 || gy > 20) return true;
+      return obstacles.some(obs => Math.hypot(obs.grid.x - gx, obs.grid.y - gy) < 1.3);
     };
-
-    const path = [];
-    let curX = start.x;
-    let curY = start.y;
-    path.push({ grid: { x: curX, y: curY } });
-
-    let safetySteps = 0;
-    while ((curX !== goal.x || curY !== goal.y) && safetySteps < 50) {
-      safetySteps++;
-      const dx = Math.sign(goal.x - curX);
-      const dy = Math.sign(goal.y - curY);
-
-      let nextX = curX;
-      let nextY = curY;
-
-      // Prefer moving along primary axis unless blocked
-      if (dx !== 0 && !isBlocked(curX + dx, curY)) {
-        nextX = curX + dx;
-      } else if (dy !== 0 && !isBlocked(curX, curY + dy)) {
-        nextY = curY + dy;
-      } else if (dx !== 0 && dy !== 0 && !isBlocked(curX + dx, curY + dy)) {
-        nextX = curX + dx;
-        nextY = curY + dy;
-      } else {
-        // Detour around obstacle
-        const detourDirs = [
-          { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 },
-          { x: 1, y: 1 }, { x: -1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: -1 }
-        ];
-        const validDetour = detourDirs.find(d => 
-          curX + d.x >= 0 && curX + d.x <= 20 &&
-          curY + d.y >= 0 && curY + d.y <= 20 &&
-          !isBlocked(curX + d.x, curY + d.y)
-        );
-
-        if (validDetour) {
-          nextX = curX + validDetour.x;
-          nextY = curY + validDetour.y;
-        } else {
-          // completely trapped
-          return null;
+    if (isBlocked(goal.x, goal.y)) return null;
+    const queue = [[start]];
+    const visited = new Set([`${start.x},${start.y}`]);
+    const dirs = [
+      { x: 0, y: 1 }, { x: 0, y: -1 }, { x: 1, y: 0 }, { x: -1, y: 0 },
+      { x: 1, y: 1 }, { x: -1, y: 1 }, { x: 1, y: -1 }, { x: -1, y: -1 }
+    ];
+    while (queue.length > 0) {
+      const path = queue.shift();
+      const curr = path[path.length - 1];
+      if (curr.x === goal.x && curr.y === goal.y) {
+        return path.map(pt => ({ grid: { x: pt.x, y: pt.y } }));
+      }
+      // Sort neighbor directions by straight-line distance to goal (A* heuristic)
+      const sortedDirs = [...dirs].sort((a, b) => {
+        const distA = Math.hypot(goal.x - (curr.x + a.x), goal.y - (curr.y + a.y));
+        const distB = Math.hypot(goal.x - (curr.x + b.x), goal.y - (curr.y + b.y));
+        return distA - distB;
+      });
+      for (const d of sortedDirs) {
+        const nx = curr.x + d.x;
+        const ny = curr.y + d.y;
+        const key = `${nx},${ny}`;
+        if (!visited.has(key) && !isBlocked(nx, ny)) {
+          visited.add(key);
+          queue.push([...path, { x: nx, y: ny }]);
         }
       }
-
-      curX = nextX;
-      curY = nextY;
-      path.push({ grid: { x: curX, y: curY } });
     }
-
-    return path;
+    return null; // Safe fallback: goal is truly unreachable
   }
 }
 

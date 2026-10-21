@@ -7,11 +7,12 @@ import {
   Wifi, 
   Compass, 
   Radio, 
-  ShieldAlert
+  ShieldAlert,
+  HelpCircle
 } from 'lucide-react';
 import { speechOutput } from '../voice/speechOutput';
 
-export function AppHeader({ status, isMuted, onToggleMute }) {
+export function AppHeader({ status, isMuted, onToggleMute, onOpenHelp, stats }) {
   const getStatusBadge = () => {
     switch (status) {
       case 'moving':
@@ -55,8 +56,17 @@ export function AppHeader({ status, isMuted, onToggleMute }) {
 
         <div className="system-stat-pill" title="Virtual Robot Battery">
           <Battery size={14} color="#10B981" />
-          <span>Power: <strong>94%</strong></span>
+          <span>Power: <strong>{stats?.batteryPercent ?? 94}%</strong></span>
         </div>
+
+        <button 
+          className="btn btn-outline btn-icon text-cyan-400"
+          onClick={onOpenHelp}
+          title="Open Simulation Guide"
+          aria-label="Help"
+        >
+          <HelpCircle size={18} />
+        </button>
 
         <button 
           className={`btn btn-outline btn-icon ${isMuted ? 'text-slate-400' : 'text-cyan-500'}`}

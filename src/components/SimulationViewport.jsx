@@ -25,7 +25,7 @@ export function SimulationViewport({
 }) {
   const [cameraMode, setCameraMode] = useState('grid'); // 'grid' | 'perspective' | 'follow'
   const [showGrid, setShowGrid] = useState(true);
-  const containerRef = useRef(null);
+  const svgRef = useRef(null);
 
   // Grid dimensions for campus map
   const GRID_SIZE = 20;
@@ -42,23 +42,21 @@ export function SimulationViewport({
   };
 
   const handleSvgClick = (e) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
+    if (!svgRef.current) return;
+    const rect = svgRef.current.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
     const clickY = e.clientY - rect.top;
 
-    const gridX = Math.round((clickX / rect.width) * GRID_SIZE);
-    const gridY = Math.round((clickY / rect.height) * GRID_SIZE);
+    const gridX = Math.min(19, Math.max(1, Math.round((clickX / rect.width) * GRID_SIZE)));
+    const gridY = Math.min(19, Math.max(1, Math.round((clickY / rect.height) * GRID_SIZE)));
 
-    if (gridX >= 1 && gridX <= 19 && gridY >= 1 && gridY <= 19) {
-      if (onAddObstacleAtClick) {
-        onAddObstacleAtClick({
-          id: `obs-${Date.now()}`,
-          grid: { x: gridX, y: gridY },
-          world: { x: gridX - 10, y: 0, z: gridY - 10 },
-          label: `Hazard [${gridX},${gridY}]`
-        });
-      }
+    if (onAddObstacleAtClick) {
+      onAddObstacleAtClick({
+        id: `obs-${Date.now()}`,
+        grid: { x: gridX, y: gridY },
+        world: { x: gridX - 10, y: 0, z: gridY - 10 },
+        label: `Hazard [${gridX},${gridY}]`
+      });
     }
   };
 
@@ -112,9 +110,7 @@ export function SimulationViewport({
       {/* Main Viewport Container */}
       <div 
         className="viewport-canvas-container"
-        ref={containerRef}
-        onClick={handleSvgClick}
-        style={{ cursor: 'crosshair', minHeight: '440px', background: '#070D18', position: 'relative' }}
+        style={{ minHeight: '440px', background: '#070D18', position: 'relative' }}
         title="Click anywhere on the campus map to place a simulated obstacle"
       >
         {children ? (
@@ -123,10 +119,13 @@ export function SimulationViewport({
           <div className="w-full h-full relative overflow-hidden flex items-center justify-center p-2 select-none">
             {/* SVG Tactical Navigation Map */}
             <svg
+              ref={svgRef}
+              onClick={handleSvgClick}
               viewBox="0 0 100 100"
               className="w-full h-full max-h-[500px]"
               preserveAspectRatio="xMidYMid meet"
               style={{
+                cursor: 'crosshair',
                 transform: cameraMode === 'perspective' ? 'rotateX(30deg) rotateZ(-10deg) scale(0.95)' : 'none',
                 transition: 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)'
               }}
@@ -235,7 +234,7 @@ export function SimulationViewport({
               })}
 
               {/* Virtual Autonomous Robot Marker */}
-              <g transform={`translate(${robotPx.x}, ${robotPx.y})`}>
+              <g transform={`translate(${robotPx.x}, ${robotPx.y}) rotate(${robotPosition?.heading || 0})`}>
                 {/* Radar pulse ring */}
                 <circle 
                   r="6" 

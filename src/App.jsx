@@ -208,6 +208,8 @@ export function App() {
         status={status}
         isMuted={isMuted}
         onToggleMute={handleToggleMute}
+        onOpenHelp={() => setShowWelcome(true)}
+        stats={stats}
       />
 
       {/* Main Responsive Grid Layout */}

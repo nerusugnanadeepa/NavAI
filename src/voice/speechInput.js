@@ -117,11 +117,23 @@ export class SpeechInputEngine {
     if (clean.includes('reset') || clean.includes('restart') || clean.includes('origin')) {
       return { type: 'RESET_SIMULATION' };
     }
-    if (clean.includes('add obstacle') || clean.includes('block') || clean.includes('obstacle')) {
-      return { type: 'ADD_OBSTACLE' };
-    }
-    if (clean.includes('remove obstacle') || clean.includes('clear obstacle')) {
+    // Prioritize removal commands first
+    if (
+      clean.includes('remove obstacle') || 
+      clean.includes('clear obstacle') || 
+      clean.includes('clear obstacles') || 
+      clean.includes('delete obstacle')
+    ) {
       return { type: 'REMOVE_OBSTACLE' };
+    }
+    // Then check obstacle injection commands
+    if (
+      clean.includes('add obstacle') || 
+      clean.includes('block') || 
+      clean.includes('hazard') || 
+      clean.includes('obstacle')
+    ) {
+      return { type: 'ADD_OBSTACLE' };
     }
 
     return { type: 'UNKNOWN', raw: text };
