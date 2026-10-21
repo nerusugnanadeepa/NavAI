@@ -641,6 +641,7 @@ export class ThreeEngine {
 
   // Switch camera modes
   setCameraMode(mode) {
+    const prevMode = this.cameraMode;
     this.cameraMode = mode; // 'perspective' | 'grid' | 'follow'
 
     if (mode === 'grid') {
@@ -650,7 +651,10 @@ export class ThreeEngine {
     } else if (mode === 'perspective') {
       // Isometric 3D view
       this.controls.enableRotate = true;
-      this.controls.target.set(0, 0, 0);
+      if (prevMode === 'grid' || prevMode === 'follow') {
+        this.cameraTargetPos = new THREE.Vector3(16, 20, 20);
+        this.isTransitioningCamera = true;
+      }
     } else if (mode === 'follow') {
       // Third-person chase camera
       this.controls.enableRotate = false;
@@ -694,6 +698,7 @@ export class ThreeEngine {
   }
 
   onPointerDown(e) {
+    this.isTransitioningCamera = false;
     // Only handle primary click
     if (e.button !== 0) return;
 
@@ -817,7 +822,13 @@ export class ThreeEngine {
       );
       this.controls.target.lerp(lookTarget, 0.12);
     } else if (this.cameraMode === 'perspective') {
-      // Perspective mode uses orbit controls smoothly
+      if (this.isTransitioningCamera && this.cameraTargetPos) {
+        this.camera.position.lerp(this.cameraTargetPos, 0.08);
+        this.controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.08);
+        if (this.camera.position.distanceTo(this.cameraTargetPos) < 0.2) {
+          this.isTransitioningCamera = false;
+        }
+      }
     }
 
     this.controls.update();

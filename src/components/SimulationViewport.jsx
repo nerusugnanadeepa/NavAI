@@ -23,7 +23,7 @@ export function SimulationViewport({
   onAddObstacleAtClick,
   onRemoveObstacle
 }) {
-  const [cameraMode, setCameraMode] = useState('grid'); // 'grid' | 'perspective' | 'follow'
+  const [cameraMode, setCameraMode] = useState('perspective'); // 'perspective' | 'grid' | 'follow'
   const [showGrid, setShowGrid] = useState(true);
   const svgRef = useRef(null);
 
