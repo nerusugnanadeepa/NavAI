@@ -33,10 +33,11 @@ export class ThreeEngine {
     this.pathPointsGroup = new THREE.Group();
     this.robotGroup = null;
     this.lidarPuck = null;
+    this.robotWheels = [];
     this.hoverPreviewMesh = null;
 
     // Animation / State Interpolation
-    this.robotTargetPos = new THREE.Vector3(0, 0.35, 0);
+    this.robotTargetPos = new THREE.Vector3(0, 0, 0);
     this.robotTargetHeading = 0; // in radians
     this.activeRoute = [];
     this.currentDestination = null;
@@ -349,89 +350,353 @@ export class ThreeEngine {
     return sprite;
   }
 
+  createRoverWheel(isLeftSide) {
+    const wheelGroup = new THREE.Group();
+
+    // Tire dimensions: radius 0.22, width 0.14
+    const tireRadius = 0.22;
+    const tireWidth = 0.14;
+
+    // Heavy-duty rugged tire rubber (matches black off-road rover tires)
+    const tireGeo = new THREE.CylinderGeometry(tireRadius, tireRadius, tireWidth, 24);
+    const tireMat = new THREE.MeshStandardMaterial({
+      color: 0x111827,
+      roughness: 0.92,
+      metalness: 0.08
+    });
+    const tire = new THREE.Mesh(tireGeo, tireMat);
+    tire.rotation.z = Math.PI / 2;
+    tire.castShadow = true;
+    tire.receiveShadow = true;
+    wheelGroup.add(tire);
+
+    // Chunky off-road tire treads (12 lugs around perimeter for rugged look)
+    const treadCount = 12;
+    const treadMat = new THREE.MeshStandardMaterial({ color: 0x070b14, roughness: 0.95 });
+    for (let i = 0; i < treadCount; i++) {
+      const angle = (i / treadCount) * Math.PI * 2;
+      const treadGeo = new THREE.BoxGeometry(tireWidth * 0.96, 0.022, 0.04);
+      const tread = new THREE.Mesh(treadGeo, treadMat);
+      tread.position.set(
+        0,
+        Math.sin(angle) * (tireRadius + 0.005),
+        Math.cos(angle) * (tireRadius + 0.005)
+      );
+      tread.rotation.x = -angle;
+      wheelGroup.add(tread);
+    }
+
+    // Inset dark metallic rim drum
+    const rimGeo = new THREE.CylinderGeometry(tireRadius * 0.74, tireRadius * 0.74, tireWidth * 1.02, 24);
+    const rimMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      roughness: 0.35,
+      metalness: 0.8
+    });
+    const rim = new THREE.Mesh(rimGeo, rimMat);
+    rim.rotation.z = Math.PI / 2;
+    wheelGroup.add(rim);
+
+    // Signature Electric Cyan / Blue Glowing Outer Rim Ring (Matches picture!)
+    const ringGeo = new THREE.RingGeometry(tireRadius * 0.48, tireRadius * 0.66, 32);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x00f2fe,
+      side: THREE.DoubleSide
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.y = Math.PI / 2;
+    // Position on outward face of wheel
+    const outerFaceX = isLeftSide ? -tireWidth / 2 - 0.006 : tireWidth / 2 + 0.006;
+    ring.position.x = outerFaceX;
+    wheelGroup.add(ring);
+
+    // Center Metallic Axle Hub Nut
+    const hubGeo = new THREE.CylinderGeometry(0.045, 0.045, tireWidth * 1.1, 16);
+    const hubMat = new THREE.MeshStandardMaterial({
+      color: 0x94a3b8,
+      metalness: 0.9,
+      roughness: 0.2
+    });
+    const hub = new THREE.Mesh(hubGeo, hubMat);
+    hub.rotation.z = Math.PI / 2;
+    wheelGroup.add(hub);
+
+    return wheelGroup;
+  }
+
   setupRobot() {
     this.robotGroup = new THREE.Group();
-    this.robotGroup.position.set(0, 0.35, 0);
+    this.robotGroup.position.set(0, 0, 0);
+    this.robotWheels = [];
 
-    // Chassis body
-    const bodyGeo = new THREE.CylinderGeometry(0.55, 0.6, 0.35, 24);
-    const bodyMat = new THREE.MeshStandardMaterial({
+    // 1. Lower Chassis Skid Plate / Undercarriage (dark slate)
+    const skidGeo = new THREE.BoxGeometry(0.66, 0.10, 0.96);
+    const skidMat = new THREE.MeshStandardMaterial({
       color: 0x0f172a,
-      metalness: 0.85,
-      roughness: 0.25
+      roughness: 0.7,
+      metalness: 0.6
+    });
+    const skid = new THREE.Mesh(skidGeo, skidMat);
+    skid.position.y = 0.16;
+    skid.castShadow = true;
+    skid.receiveShadow = true;
+    this.robotGroup.add(skid);
+
+    // 2. White Satin Body Hull (Matches the white delivery rover in the picture)
+    const bodyGeo = new THREE.BoxGeometry(0.74, 0.24, 0.98);
+    const bodyMat = new THREE.MeshStandardMaterial({
+      color: 0xf8fafc,
+      roughness: 0.25,
+      metalness: 0.15
     });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
+    body.position.y = 0.31;
     body.castShadow = true;
+    body.receiveShadow = true;
     this.robotGroup.add(body);
 
-    // Glowing cyan cyber ring around chassis
-    const haloGeo = new THREE.TorusGeometry(0.58, 0.04, 16, 32);
-    const haloMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
-    const halo = new THREE.Mesh(haloGeo, haloMat);
-    halo.rotation.x = Math.PI / 2;
-    this.robotGroup.add(halo);
+    // Rounded vertical corners for sleek automotive rover styling
+    const cornerRadius = 0.08;
+    const cornerHeight = 0.24;
+    const cornerGeo = new THREE.CylinderGeometry(cornerRadius, cornerRadius, cornerHeight, 16);
+    const cornerPositions = [
+      [-0.30, 0.31, -0.42],
+      [0.30, 0.31, -0.42],
+      [-0.30, 0.31, 0.42],
+      [0.30, 0.31, 0.42]
+    ];
+    cornerPositions.forEach(([x, y, z]) => {
+      const corner = new THREE.Mesh(cornerGeo, bodyMat);
+      corner.position.set(x, y, z);
+      corner.castShadow = true;
+      this.robotGroup.add(corner);
+    });
 
-    // Spinning LiDAR sensor puck on top
-    const lidarGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.16, 16);
-    const lidarMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.9, roughness: 0.1 });
-    this.lidarPuck = new THREE.Mesh(lidarGeo, lidarMat);
-    this.lidarPuck.position.y = 0.25;
-    this.robotGroup.add(this.lidarPuck);
+    // Front Bumper / Nose Slope Panel
+    const noseGeo = new THREE.BoxGeometry(0.62, 0.12, 0.10);
+    const nose = new THREE.Mesh(noseGeo, bodyMat);
+    nose.position.set(0, 0.25, -0.50);
+    nose.rotation.x = Math.PI / 12;
+    this.robotGroup.add(nose);
 
-    // LiDAR laser scanner eye
-    const laserEyeGeo = new THREE.BoxGeometry(0.08, 0.05, 0.18);
-    const laserEyeMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-    const laserEye = new THREE.Mesh(laserEyeGeo, laserEyeMat);
-    laserEye.position.set(0.12, 0.25, 0);
-    this.lidarPuck.add(laserEye);
+    // Front Lower Sensor / Air Intake Slit (dark contrast)
+    const intakeGeo = new THREE.BoxGeometry(0.48, 0.04, 0.03);
+    const intakeMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
+    const intake = new THREE.Mesh(intakeGeo, intakeMat);
+    intake.position.set(0, 0.20, -0.51);
+    this.robotGroup.add(intake);
 
-    // Forward Direction Pointer Cone
-    const pointerGeo = new THREE.ConeGeometry(0.14, 0.3, 16);
-    const pointerMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-    const pointer = new THREE.Mesh(pointerGeo, pointerMat);
-    pointer.rotation.x = -Math.PI / 2;
-    pointer.position.set(0, 0.1, -0.65);
-    this.robotGroup.add(pointer);
+    // 3. Signature Cyan LED Cyber Light Bar (Horizontal wrap-around headlight)
+    const lightBarMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      emissive: 0x00f2fe,
+      emissiveIntensity: 2.8,
+      roughness: 0.1,
+      metalness: 0.5
+    });
 
-    // Headlight spotlights casting light in front of robot
-    const headlight = new THREE.SpotLight(0x67e8f9, 4.0, 8, Math.PI / 4, 0.5, 1.2);
-    headlight.position.set(0, 0.1, -0.4);
+    // Front horizontal light strip
+    const frontLightGeo = new THREE.BoxGeometry(0.70, 0.045, 0.04);
+    const frontLight = new THREE.Mesh(frontLightGeo, lightBarMat);
+    frontLight.position.set(0, 0.41, -0.50);
+    this.robotGroup.add(frontLight);
+
+    // Wrap-around side light strips (left & right front quarter panels)
+    const sideLightGeo = new THREE.BoxGeometry(0.04, 0.045, 0.32);
+    const leftSideLight = new THREE.Mesh(sideLightGeo, lightBarMat);
+    leftSideLight.position.set(-0.375, 0.41, -0.34);
+    this.robotGroup.add(leftSideLight);
+
+    const rightSideLight = new THREE.Mesh(sideLightGeo, lightBarMat);
+    rightSideLight.position.set(0.375, 0.41, -0.34);
+    this.robotGroup.add(rightSideLight);
+
+    // Directional forward cyan pavement illumination
+    const frontGlow = new THREE.PointLight(0x00f2fe, 2.5, 4.5, 1.2);
+    frontGlow.position.set(0, 0.38, -0.65);
+    this.robotGroup.add(frontGlow);
+
+    // Forward beam spotlight casting light ahead along path
+    const headlight = new THREE.SpotLight(0x67e8f9, 3.5, 8, Math.PI / 4, 0.4, 1.2);
+    headlight.position.set(0, 0.40, -0.55);
     const headlightTarget = new THREE.Object3D();
     headlightTarget.position.set(0, 0, -5);
     this.robotGroup.add(headlightTarget);
     headlight.target = headlightTarget;
     this.robotGroup.add(headlight);
 
-    // Wheels
-    const wheelGeo = new THREE.CylinderGeometry(0.18, 0.18, 0.12, 16);
-    const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.9 });
-    [-0.55, 0.55].forEach((x) => {
-      const wheel = new THREE.Mesh(wheelGeo, wheelMat);
-      wheel.rotation.z = Math.PI / 2;
-      wheel.position.set(x, -0.12, 0);
-      this.robotGroup.add(wheel);
+    // 4. Black Top Deck / Hood / Sunroof
+    const deckGeo = new THREE.BoxGeometry(0.68, 0.03, 0.90);
+    const deckMat = new THREE.MeshStandardMaterial({
+      color: 0x090d16,
+      roughness: 0.3,
+      metalness: 0.85
+    });
+    const deck = new THREE.Mesh(deckGeo, deckMat);
+    deck.position.y = 0.44;
+    deck.castShadow = true;
+    this.robotGroup.add(deck);
+
+    // 5. Center Sensor Turret & LiDAR Dome (Matches multi-camera & LiDAR head)
+    const turretGroup = new THREE.Group();
+    turretGroup.position.set(0, 0.455, -0.02);
+
+    // Base Mounting Collar
+    const baseCollarGeo = new THREE.CylinderGeometry(0.22, 0.24, 0.05, 32);
+    const baseCollarMat = new THREE.MeshStandardMaterial({
+      color: 0x1e293b,
+      metalness: 0.8,
+      roughness: 0.3
+    });
+    const baseCollar = new THREE.Mesh(baseCollarGeo, baseCollarMat);
+    baseCollar.position.y = 0.025;
+    baseCollar.castShadow = true;
+    turretGroup.add(baseCollar);
+
+    // Camera Sensor Housing Block (Middle tier)
+    const camHousingGeo = new THREE.CylinderGeometry(0.18, 0.20, 0.09, 32);
+    const camHousingMat = new THREE.MeshStandardMaterial({
+      color: 0x0b1120,
+      metalness: 0.9,
+      roughness: 0.15
+    });
+    const camHousing = new THREE.Mesh(camHousingGeo, camHousingMat);
+    camHousing.position.y = 0.09;
+    camHousing.castShadow = true;
+    turretGroup.add(camHousing);
+
+    // Front AI Vision Camera Lens Aperture (As seen in the picture!)
+    const lensApertureGeo = new THREE.CylinderGeometry(0.032, 0.032, 0.015, 16);
+    const lensApertureMat = new THREE.MeshStandardMaterial({
+      color: 0x0284c7,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.6,
+      metalness: 0.95,
+      roughness: 0.05
+    });
+    const frontLens = new THREE.Mesh(lensApertureGeo, lensApertureMat);
+    frontLens.rotation.x = Math.PI / 2;
+    frontLens.position.set(0, 0.09, -0.19);
+    turretGroup.add(frontLens);
+
+    // Side & rear camera sensor dots
+    [
+      [-0.19, 0.09, 0, Math.PI / 2],
+      [0.19, 0.09, 0, -Math.PI / 2],
+      [0, 0.09, 0.19, Math.PI]
+    ].forEach(([x, y, z, rotY]) => {
+      const sensorDot = new THREE.Mesh(lensApertureGeo, lensApertureMat);
+      sensorDot.rotation.x = Math.PI / 2;
+      sensorDot.rotation.z = rotY;
+      sensorDot.position.set(x, y, z);
+      turretGroup.add(sensorDot);
     });
 
-    // Floating NaviBot Nameplate
+    // Rotating 360° LiDAR Puck (Top tier)
+    const lidarGroup = new THREE.Group();
+    lidarGroup.position.set(0, 0.18, 0);
+
+    const lidarPuckGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.09, 32);
+    const lidarPuckMat = new THREE.MeshStandardMaterial({
+      color: 0x0f172a,
+      metalness: 0.85,
+      roughness: 0.2
+    });
+    const puckBody = new THREE.Mesh(lidarPuckGeo, lidarPuckMat);
+    lidarGroup.add(puckBody);
+
+    // Reflective optical sensor slit band around LiDAR
+    const slitGeo = new THREE.CylinderGeometry(0.153, 0.153, 0.028, 32);
+    const slitMat = new THREE.MeshStandardMaterial({
+      color: 0x0369a1,
+      emissive: 0x0284c7,
+      emissiveIntensity: 0.8,
+      roughness: 0.1
+    });
+    const slit = new THREE.Mesh(slitGeo, slitMat);
+    lidarGroup.add(slit);
+
+    // Glowing laser scanner indicator eye
+    const eyeGeo = new THREE.BoxGeometry(0.04, 0.02, 0.06);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+    const eye = new THREE.Mesh(eyeGeo, eyeMat);
+    eye.position.set(0.12, 0, 0);
+    lidarGroup.add(eye);
+
+    // Turret Crown Cap & Center Antenna Node
+    const crownGeo = new THREE.CylinderGeometry(0.09, 0.11, 0.03, 32);
+    const crownMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 });
+    const crown = new THREE.Mesh(crownGeo, crownMat);
+    crown.position.y = 0.06;
+    lidarGroup.add(crown);
+
+    const antennaGeo = new THREE.CylinderGeometry(0.015, 0.02, 0.05, 16);
+    const antennaMat = new THREE.MeshStandardMaterial({ color: 0x020617, metalness: 0.9 });
+    const antenna = new THREE.Mesh(antennaGeo, antennaMat);
+    antenna.position.y = 0.095;
+    lidarGroup.add(antenna);
+
+    this.lidarPuck = lidarGroup;
+    turretGroup.add(this.lidarPuck);
+    this.robotGroup.add(turretGroup);
+
+    // 6. 4 Off-Road All-Terrain Rover Wheels (4WD)
+    // Left side wheels (isLeftSide = true)
+    const flWheel = this.createRoverWheel(true);
+    flWheel.position.set(-0.48, 0.22, -0.32);
+    this.robotGroup.add(flWheel);
+    this.robotWheels.push(flWheel);
+
+    const rlWheel = this.createRoverWheel(true);
+    rlWheel.position.set(-0.48, 0.22, 0.32);
+    this.robotGroup.add(rlWheel);
+    this.robotWheels.push(rlWheel);
+
+    // Right side wheels (isLeftSide = false)
+    const frWheel = this.createRoverWheel(false);
+    frWheel.position.set(0.48, 0.22, -0.32);
+    this.robotGroup.add(frWheel);
+    this.robotWheels.push(frWheel);
+
+    const rrWheel = this.createRoverWheel(false);
+    rrWheel.position.set(0.48, 0.22, 0.32);
+    this.robotGroup.add(rrWheel);
+    this.robotWheels.push(rrWheel);
+
+    // Wheel axle connecting rods into the chassis
+    const axleGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.98, 16);
+    const axleMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 });
+    [-0.32, 0.32].forEach((z) => {
+      const axle = new THREE.Mesh(axleGeo, axleMat);
+      axle.rotation.z = Math.PI / 2;
+      axle.position.set(0, 0.22, z);
+      this.robotGroup.add(axle);
+    });
+
+    // 7. Floating NaviBot Nameplate Badge
     const canvas = document.createElement('canvas');
-    canvas.width = 128;
-    canvas.height = 36;
+    canvas.width = 160;
+    canvas.height = 42;
     const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(6, 182, 212, 0.85)';
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.strokeStyle = '#06B6D4';
+    ctx.lineWidth = 3;
     ctx.beginPath();
-    ctx.roundRect(4, 4, 120, 28, 8);
+    ctx.roundRect(4, 4, 152, 34, 10);
     ctx.fill();
-    ctx.fillStyle = '#0F172A';
-    ctx.font = 'bold 16px sans-serif';
+    ctx.stroke();
+
+    ctx.fillStyle = '#38BDF8';
+    ctx.font = 'bold 15px system-ui, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText('NaviBot', 64, 18);
+    ctx.fillText('NaviBot • AMR', 80, 21);
 
     const tagTexture = new THREE.CanvasTexture(canvas);
     const tagMat = new THREE.SpriteMaterial({ map: tagTexture, transparent: true });
     const tagSprite = new THREE.Sprite(tagMat);
-    tagSprite.scale.set(1.4, 0.4, 1);
-    tagSprite.position.set(0, 0.85, 0);
+    tagSprite.scale.set(1.5, 0.4, 1);
+    tagSprite.position.set(0, 1.05, 0);
     this.robotGroup.add(tagSprite);
 
     this.scene.add(this.robotGroup);
@@ -616,7 +881,7 @@ export class ThreeEngine {
 
     const wx = robotPosition.grid.x - 10;
     const wz = robotPosition.grid.y - 10;
-    this.robotTargetPos.set(wx, 0.35, wz);
+    this.robotTargetPos.set(wx, 0, wz);
 
     // Convert heading in degrees to radians
     // 0 deg in controller is North (-Z direction in Three.js)
@@ -781,7 +1046,18 @@ export class ThreeEngine {
       this.lidarPuck.rotation.y += delta * 12.0;
     }
 
-    // 3. Animate floating hazard diamonds
+    // 3. Spin rover wheels dynamically when driving
+    if (this.robotWheels && this.robotWheels.length > 0) {
+      const isMoving = this.status === 'moving' || this.status === 'avoiding_obstacle';
+      if (isMoving) {
+        const wheelSpin = delta * 10.0;
+        this.robotWheels.forEach((wheel) => {
+          wheel.rotation.x -= wheelSpin;
+        });
+      }
+    }
+
+    // 4. Animate floating hazard diamonds
     this.obstacleMeshes.forEach((mesh) => {
       const diamond = mesh.getObjectByName('floating_diamond');
       if (diamond) {
@@ -880,10 +1156,10 @@ export class ThreeEngine {
 
   resetSimulation() {
     this.updateDestination(null);
-    this.robotTargetPos.set(0, 0.35, 0);
+    this.robotTargetPos.set(0, 0, 0);
     this.robotTargetHeading = 0;
     if (this.robotGroup) {
-      this.robotGroup.position.set(0, 0.35, 0);
+      this.robotGroup.position.set(0, 0, 0);
       this.robotGroup.rotation.y = 0;
     }
     this.syncRoute([], 'idle');
