@@ -352,6 +352,7 @@ export class SimulationController {
       currentDestination: null,
       robotPosition: { ...INITIAL_ROBOT_POSITION },
       activeRoute: [],
+      obstacles: [],
       progressPercent: 0,
       isObstacleDetected: false,
       blockedSegment: null,
@@ -359,7 +360,9 @@ export class SimulationController {
         ...this.state.stats,
         waypointsRemaining: 0,
         totalWaypoints: 0,
-        distanceTraveled: 0
+        distanceTraveled: 0,
+        speedMps: 0.0,
+        batteryPercent: 98
       }
     });
 
@@ -725,6 +728,8 @@ export class SimulationController {
         : (this.state.robotPosition.heading || 0);
 
       this.cumulativeDistance += 1.2;
+      const currentSpeedMps = parseFloat((0.8 * (this.state.speed || 1.0)).toFixed(1));
+      const batteryLevel = Math.max(1, Math.round(98 - this.cumulativeDistance * 0.1));
 
       this.setState({
         robotPosition: {
@@ -736,7 +741,9 @@ export class SimulationController {
         stats: {
           ...this.state.stats,
           waypointsRemaining: remaining,
-          distanceTraveled: this.cumulativeDistance.toFixed(1)
+          distanceTraveled: this.cumulativeDistance.toFixed(1),
+          speedMps: currentSpeedMps,
+          batteryPercent: batteryLevel
         }
       });
 

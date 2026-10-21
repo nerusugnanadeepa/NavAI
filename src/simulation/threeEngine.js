@@ -1746,6 +1746,7 @@ export class ThreeEngine {
 
   resetSimulation() {
     this.updateDestination(null);
+    this.syncObstacles([]);
     this.robotTargetPos.set(-5, 0, 5.5);
     this.robotTargetHeading = THREE.MathUtils.degToRad(-45 + 180);
     if (this.robotGroup) {
