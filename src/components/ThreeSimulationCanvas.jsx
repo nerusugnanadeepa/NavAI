@@ -20,38 +20,45 @@ export function ThreeSimulationCanvas({
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const engine = new ThreeEngine(containerRef.current, {
-      onAddObstacleAtClick,
-      onRemoveObstacle
-    });
-    engineRef.current = engine;
+    let engine = null;
+    let resizeObserver = null;
 
-    // Initial state sync with fallback to simulationController
-    const simState = simulationController.getState();
-    const effObstacles = (obstacles && obstacles.length > 0) ? obstacles : simState.obstacles;
-    const effRoute = (activeRoute && activeRoute.length > 0) ? activeRoute : simState.activeRoute;
-    const effPos = robotPosition || simState.robotPosition;
-    const effDest = currentDestination !== undefined ? currentDestination : simState.currentDestination;
-    const effStatus = status || simState.status;
+    try {
+      engine = new ThreeEngine(containerRef.current, {
+        onAddObstacleAtClick,
+        onRemoveObstacle
+      });
+      engineRef.current = engine;
 
-    engine.syncObstacles(effObstacles || []);
-    engine.syncRoute(effRoute || [], effStatus);
-    engine.updateRobotPose(effPos);
-    engine.updateDestination(effDest);
-    engine.setCameraMode(cameraMode);
-    engine.setShowGrid(showGrid);
+      // Initial state sync with fallback to simulationController
+      const simState = simulationController.getState();
+      const effObstacles = (obstacles && obstacles.length > 0) ? obstacles : simState.obstacles;
+      const effRoute = (activeRoute && activeRoute.length > 0) ? activeRoute : simState.activeRoute;
+      const effPos = robotPosition || simState.robotPosition;
+      const effDest = currentDestination !== undefined ? currentDestination : simState.currentDestination;
+      const effStatus = status || simState.status;
 
-    // ResizeObserver to handle fluid container resizing
-    const resizeObserver = new ResizeObserver(() => {
-      if (engineRef.current) {
-        engineRef.current.onResize();
-      }
-    });
-    resizeObserver.observe(containerRef.current);
+      engine.syncObstacles(effObstacles || []);
+      engine.syncRoute(effRoute || [], effStatus);
+      engine.updateRobotPose(effPos);
+      engine.updateDestination(effDest);
+      engine.setCameraMode(cameraMode);
+      engine.setShowGrid(showGrid);
+
+      // ResizeObserver to handle fluid container resizing
+      resizeObserver = new ResizeObserver(() => {
+        if (engineRef.current) {
+          engineRef.current.onResize();
+        }
+      });
+      resizeObserver.observe(containerRef.current);
+    } catch (err) {
+      console.warn('ThreeEngine initialization caught error, continuing UI render:', err);
+    }
 
     return () => {
-      resizeObserver.disconnect();
-      engine.dispose();
+      if (resizeObserver) resizeObserver.disconnect();
+      if (engine) engine.dispose();
       engineRef.current = null;
     };
   }, []);
