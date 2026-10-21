@@ -847,59 +847,92 @@ export class ThreeEngine {
     this.robotGroup.rotation.y = this.robotTargetHeading;
     this.robotWheels = [];
 
+    // Scale robot to be prominent and clearly visible like in reference image
+    this.robotGroup.scale.set(1.3, 1.3, 1.3);
+
     // 1. Undercarriage Skid Plate
-    const skidGeo = new THREE.BoxGeometry(0.66, 0.10, 0.96);
+    const skidGeo = new THREE.BoxGeometry(0.72, 0.12, 1.02);
     const skidMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.7, metalness: 0.6 });
     const skid = new THREE.Mesh(skidGeo, skidMat);
     skid.position.y = 0.16;
     skid.castShadow = true;
     this.robotGroup.add(skid);
 
-    // 2. White Satin Body Hull
-    const bodyGeo = new THREE.BoxGeometry(0.74, 0.24, 0.98);
-    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.25, metalness: 0.15 });
+    // 2. White Glossy Body Hull (Curved autonomous rover body)
+    const bodyGeo = new THREE.BoxGeometry(0.82, 0.28, 1.05);
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.18, metalness: 0.12 });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = 0.32;
+    body.position.y = 0.34;
     body.castShadow = true;
     body.receiveShadow = true;
     this.robotGroup.add(body);
 
-    // Sloped aerodynamic front nose
-    const noseGeo = new THREE.BoxGeometry(0.72, 0.18, 0.22);
-    const nose = new THREE.Mesh(noseGeo, bodyMat);
-    nose.position.set(0, 0.27, 0.52);
-    nose.rotation.x = 0.18;
-    this.robotGroup.add(nose);
+    // Black curved roof deck
+    const roofGeo = new THREE.BoxGeometry(0.68, 0.06, 0.88);
+    const roofMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.3, metalness: 0.8 });
+    const roof = new THREE.Mesh(roofGeo, roofMat);
+    roof.position.y = 0.49;
+    this.robotGroup.add(roof);
 
-    // 3. Front LED Headlight Eyes
-    const eyeGeo = new THREE.PlaneGeometry(0.12, 0.08);
-    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
+    // 3. Black Glossy Face Visor (Matches Reference Image!)
+    const visorGeo = new THREE.BoxGeometry(0.74, 0.22, 0.10);
+    const visorMat = new THREE.MeshStandardMaterial({ color: 0x090d16, roughness: 0.1, metalness: 0.85 });
+    const visor = new THREE.Mesh(visorGeo, visorMat);
+    visor.position.set(0, 0.32, 0.52);
+    this.robotGroup.add(visor);
+
+    // Glowing Cyan Digital Eyes (Matches Reference Image!)
+    const eyeGeo = new THREE.BoxGeometry(0.14, 0.08, 0.02);
+    const eyeMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe });
     [-0.18, 0.18].forEach((ex) => {
       const eye = new THREE.Mesh(eyeGeo, eyeMat);
-      eye.position.set(ex, 0.28, 0.62);
+      eye.position.set(ex, 0.32, 0.575);
       this.robotGroup.add(eye);
     });
 
-    // 4. Wrap-Around Neon Cyan Cyber Light Bar
-    const lightBarGeo = new THREE.BoxGeometry(0.76, 0.038, 0.06);
-    const lightBarMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe });
-    const lightBar = new THREE.Mesh(lightBarGeo, lightBarMat);
-    lightBar.position.set(0, 0.21, 0.58);
-    this.robotGroup.add(lightBar);
+    // Front Bumper with Cyan Accent Light
+    const bumperGeo = new THREE.BoxGeometry(0.78, 0.06, 0.08);
+    const bumperMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
+    const bumper = new THREE.Mesh(bumperGeo, bumperMat);
+    bumper.position.set(0, 0.18, 0.53);
+    this.robotGroup.add(bumper);
 
-    // 5. Sensor Turret with Continuously Spinning LiDAR Puck
+    const cyanStripGeo = new THREE.BoxGeometry(0.70, 0.02, 0.02);
+    const cyanStripMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe });
+    const cyanStrip = new THREE.Mesh(cyanStripGeo, cyanStripMat);
+    cyanStrip.position.set(0, 0.18, 0.575);
+    this.robotGroup.add(cyanStrip);
+
+    // 4. Sensor Turret Base with Continuously Spinning LiDAR Puck
     const turretBaseGeo = new THREE.CylinderGeometry(0.24, 0.28, 0.16, 24);
-    const turretBaseMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4, metalness: 0.8 });
+    const turretBaseMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.8 });
     const turretBase = new THREE.Mesh(turretBaseGeo, turretBaseMat);
-    turretBase.position.y = 0.44 + 0.08;
+    turretBase.position.y = 0.56;
     turretBase.castShadow = true;
     this.robotGroup.add(turretBase);
 
-    // Rotating LiDAR puck
-    const puckGeo = new THREE.CylinderGeometry(0.20, 0.20, 0.12, 24);
-    const puckMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3, metalness: 0.9 });
-    this.lidarPuck = new THREE.Mesh(puckGeo, puckMat);
-    this.lidarPuck.position.y = 0.52 + 0.10;
+    // Rotating LiDAR puck with top cap and sensor band
+    const puckGroup = new THREE.Group();
+    puckGroup.position.y = 0.68;
+
+    const puckGeo = new THREE.CylinderGeometry(0.20, 0.20, 0.14, 24);
+    const puckMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.25, metalness: 0.9 });
+    const puck = new THREE.Mesh(puckGeo, puckMat);
+    puckGroup.add(puck);
+
+    const capGeo = new THREE.CylinderGeometry(0.21, 0.21, 0.03, 24);
+    const capMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.4 });
+    const cap = new THREE.Mesh(capGeo, capMat);
+    cap.position.y = 0.08;
+    puckGroup.add(cap);
+
+    const sensorGeo = new THREE.BoxGeometry(0.06, 0.06, 0.12);
+    const sensorMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe });
+    const sensor = new THREE.Mesh(sensorGeo, sensorMat);
+    sensor.position.set(0, 0, 0.16);
+    puckGroup.add(sensor);
+
+    this.lidarPuck = puckGroup;
     this.robotGroup.add(this.lidarPuck);
 
     // Optical camera lens
@@ -907,21 +940,21 @@ export class ThreeEngine {
     const lensMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.9, roughness: 0.1 });
     const lens = new THREE.Mesh(lensGeo, lensMat);
     lens.rotation.x = Math.PI / 2;
-    lens.position.set(0, 0.56, 0.21);
+    lens.position.set(0, 0.48, 0.54);
     this.robotGroup.add(lens);
 
-    // 6. Forward POV Camera (Used for Camera View HUD card)
+    // 5. Forward POV Camera (Used for Camera View HUD card)
     this.povCamera = new THREE.PerspectiveCamera(55, 16 / 9, 0.1, 80);
-    this.povCamera.position.set(0, 0.65, 0.25);
+    this.povCamera.position.set(0, 0.70, 0.35);
     this.povCamera.rotation.set(-0.04, Math.PI, 0); // Looking forward
     this.robotGroup.add(this.povCamera);
 
-    // 7. Mount 4 Heavy-Duty Wheels
+    // 6. Mount 4 Heavy-Duty Wheels with Signature Glowing Cyan Rims
     const wheelPositions = [
-      { x: -0.42, y: 0.22, z: 0.34, isLeft: true },
-      { x: 0.42, y: 0.22, z: 0.34, isLeft: false },
-      { x: -0.42, y: 0.22, z: -0.34, isLeft: true },
-      { x: 0.42, y: 0.22, z: -0.34, isLeft: false }
+      { x: -0.46, y: 0.22, z: 0.36, isLeft: true },
+      { x: 0.46, y: 0.22, z: 0.36, isLeft: false },
+      { x: -0.46, y: 0.22, z: -0.36, isLeft: true },
+      { x: 0.46, y: 0.22, z: -0.36, isLeft: false }
     ];
 
     wheelPositions.forEach((wp) => {

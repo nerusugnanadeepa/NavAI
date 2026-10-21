@@ -839,55 +839,35 @@
   display: block;
 }
 
-/* Floating Glassmorphic HUD Layer */
+/* Floating Glassmorphic HUD Layer - Zero Grid Overlaps */
 .hud-overlay-container {
   position: absolute;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   z-index: 10;
   pointer-events: none;
-  display: grid;
-  grid-template-columns: 280px 1fr 340px;
-  grid-template-rows: auto 1fr auto;
-  padding: 20px;
-  box-sizing: border-box;
-  gap: 16px;
-}
-
-/* Top Command Header Bar in HUD (passes clicks through transparent regions to 3D scene) */
-.hud-top-command-bar {
-  grid-column: 1 / -1;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  pointer-events: none;
-  z-index: 20;
-}
-
-.hud-top-command-bar > * {
-  pointer-events: auto;
+  overflow: hidden;
 }
 
 /* HUD Glassmorphic Card Base */
 .hud-card {
   pointer-events: auto;
-  background: rgba(15, 23, 42, 0.78);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  background: rgba(15, 23, 42, 0.82);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 14px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
   color: #f8fafc;
   overflow: hidden;
   transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .hud-card:hover {
-  border-color: rgba(56, 189, 248, 0.4);
-  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.55);
+  border-color: rgba(56, 189, 248, 0.45);
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.65);
 }
 
 .hud-card-header {
@@ -904,14 +884,24 @@
   letter-spacing: -0.01em;
 }
 
-/* --- Top-Left: Brand Card & Vertical Menu --- */
-.left-sidebar-stack {
-  grid-column: 1;
-  grid-row: 1 / span 2;
+/* --- 1. Top-Left: Brand Card & Vertical Menu Anchor --- */
+.hud-top-left-anchor {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  width: 250px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  width: 250px;
+  gap: 10px;
+  pointer-events: auto;
+  z-index: 20;
+}
+
+.left-sidebar-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
 }
 
 .brand-card {
@@ -1008,12 +998,14 @@
   flex-shrink: 0;
 }
 
-/* --- Top-Right: Robot Status Card --- */
+/* --- 2. Top-Right: Robot Status Card Anchor --- */
 .hud-top-right-anchor {
-  grid-column: 3;
-  grid-row: 1;
-  justify-self: end;
+  position: absolute;
+  top: 24px;
+  right: 24px;
   width: 320px;
+  pointer-events: auto;
+  z-index: 20;
 }
 
 .robot-status-hud-card {
@@ -1072,12 +1064,14 @@
   font-weight: 500;
 }
 
-/* --- Bottom-Left: Campus Map (Top View) --- */
+/* --- 3. Bottom-Left: Campus Map (Top View) Anchor --- */
 .hud-bottom-left-anchor {
-  grid-column: 1;
-  grid-row: 3;
-  align-self: end;
-  width: 270px;
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  width: 310px;
+  pointer-events: auto;
+  z-index: 20;
 }
 
 .minimap-card {
@@ -1121,13 +1115,14 @@
   border-radius: 50%;
 }
 
-/* --- Bottom-Center: Navigation Controls --- */
+/* --- 4. Bottom-Center: Navigation Controls Anchor --- */
 .hud-bottom-center-anchor {
-  grid-column: 2;
-  grid-row: 3;
-  justify-self: center;
-  align-self: end;
-  margin-bottom: 8px;
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  z-index: 20;
 }
 
 .nav-controls-card {
@@ -1208,16 +1203,17 @@
   color: #e2e8f0;
 }
 
-/* --- Bottom-Right: Camera View & Voice Assistant Stack --- */
+/* --- 5. Bottom-Right: Camera View & Voice Assistant Stack Anchor --- */
 .hud-bottom-right-anchor {
-  grid-column: 3;
-  grid-row: 2 / span 2;
-  align-self: end;
-  justify-self: end;
-  width: 320px;
+  position: absolute;
+  bottom: 24px;
+  right: 24px;
+  width: 330px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  pointer-events: auto;
+  z-index: 20;
 }
 
 /* Camera View (Object Detection) */

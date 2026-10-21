@@ -246,40 +246,8 @@ export function App() {
 
       {/* 2. Floating Glassmorphic HUD Card Layer Matching Reference Image Layout */}
       <div className="hud-overlay-container">
-        {/* Top Command Bar & Utility Controls */}
-        <div className="hud-top-command-bar">
-          <div className="flex-1 max-w-xl">
-            <CommandBar
-              onExecuteCommand={(cmdStr) => {
-                const parsed = speechInput.parseCommand(cmdStr);
-                handleVoiceCommand(parsed, cmdStr);
-              }}
-              currentLanguage={currentLanguage}
-            />
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              className="hud-mini-btn"
-              onClick={handleToggleMute}
-              title={isMuted ? 'Unmute voice guidance' : 'Mute voice guidance'}
-            >
-              {isMuted ? <VolumeX size={15} className="text-red-400" /> : <Volume2 size={15} className="text-cyan-400" />}
-            </button>
-            <button
-              type="button"
-              className="hud-mini-btn"
-              onClick={() => setShowWelcome(true)}
-              title="Help & System Info"
-            >
-              <HelpCircle size={15} />
-            </button>
-          </div>
-        </div>
-
         {/* Top-Left: Brand Card + Vertical Navigation Menu */}
-        <div className="left-sidebar-stack">
+        <div className="hud-top-left-anchor">
           <LeftSidebar
             activeTab={activeTab}
             onSelectTab={(tab) => {
