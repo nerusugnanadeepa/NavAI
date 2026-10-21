@@ -16,6 +16,9 @@ import {
   SimulationViewport 
 } from './components/SimulationViewport';
 import { 
+  ThreeSimulationCanvas 
+} from './components/ThreeSimulationCanvas';
+import { 
   ObstacleAlert 
 } from './components/ObstacleAlert';
 import { 
@@ -251,7 +254,9 @@ export function App() {
               removeObstacle(id);
               addLogEvent(`Obstacle removed from simulation.`, 'obstacle');
             }}
-          />
+          >
+            <ThreeSimulationCanvas />
+          </SimulationViewport>
 
           {/* Simulation Controls Cluster */}
           <SimulationControls

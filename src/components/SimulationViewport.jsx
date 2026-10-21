@@ -97,6 +97,16 @@ export function SimulationViewport({
 
           <button
             type="button"
+            className={`hud-btn ${cameraMode === 'follow' ? 'active' : ''}`}
+            onClick={() => setCameraMode('follow')}
+            title="Third-Person Follow Camera Tracking NaviBot"
+          >
+            <Radio size={12} />
+            <span>Follow</span>
+          </button>
+
+          <button
+            type="button"
             className={`hud-btn ${showGrid ? 'active' : ''}`}
             onClick={() => setShowGrid(!showGrid)}
             title="Toggle Grid Lines"
@@ -114,7 +124,19 @@ export function SimulationViewport({
         title="Click anywhere on the campus map to place a simulated obstacle"
       >
         {children ? (
-          children
+          React.isValidElement(children)
+            ? React.cloneElement(children, {
+                cameraMode,
+                showGrid,
+                status,
+                currentDestination,
+                robotPosition,
+                obstacles,
+                activeRoute,
+                onAddObstacleAtClick,
+                onRemoveObstacle
+              })
+            : children
         ) : (
           <div className="w-full h-full relative overflow-hidden flex items-center justify-center p-2 select-none">
             {/* SVG Tactical Navigation Map */}
