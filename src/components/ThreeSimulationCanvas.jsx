@@ -1,12 +1,13 @@
 import React, { useEffect, useRef } from 'react';
 import { ThreeEngine } from '../simulation/threeEngine';
+import { simulationController } from '../simulation/simulationController';
 
 export function ThreeSimulationCanvas({
   status,
   currentDestination,
   robotPosition,
-  obstacles = [],
-  activeRoute = [],
+  obstacles,
+  activeRoute,
   onAddObstacleAtClick,
   onRemoveObstacle,
   cameraMode = 'perspective',
@@ -25,11 +26,18 @@ export function ThreeSimulationCanvas({
     });
     engineRef.current = engine;
 
-    // Initial state sync
-    engine.syncObstacles(obstacles);
-    engine.syncRoute(activeRoute, status);
-    engine.updateRobotPose(robotPosition);
-    engine.updateDestination(currentDestination);
+    // Initial state sync with fallback to simulationController
+    const simState = simulationController.getState();
+    const effObstacles = (obstacles && obstacles.length > 0) ? obstacles : simState.obstacles;
+    const effRoute = (activeRoute && activeRoute.length > 0) ? activeRoute : simState.activeRoute;
+    const effPos = robotPosition || simState.robotPosition;
+    const effDest = currentDestination !== undefined ? currentDestination : simState.currentDestination;
+    const effStatus = status || simState.status;
+
+    engine.syncObstacles(effObstacles || []);
+    engine.syncRoute(effRoute || [], effStatus);
+    engine.updateRobotPose(effPos);
+    engine.updateDestination(effDest);
     engine.setCameraMode(cameraMode);
     engine.setShowGrid(showGrid);
 
@@ -60,7 +68,7 @@ export function ThreeSimulationCanvas({
 
   // Sync obstacles
   useEffect(() => {
-    if (engineRef.current) {
+    if (engineRef.current && obstacles) {
       engineRef.current.syncObstacles(obstacles);
     }
   }, [obstacles]);
@@ -74,14 +82,14 @@ export function ThreeSimulationCanvas({
 
   // Sync robot position & heading
   useEffect(() => {
-    if (engineRef.current) {
+    if (engineRef.current && robotPosition) {
       engineRef.current.updateRobotPose(robotPosition);
     }
   }, [robotPosition]);
 
   // Sync active destination
   useEffect(() => {
-    if (engineRef.current) {
+    if (engineRef.current && currentDestination !== undefined) {
       engineRef.current.updateDestination(currentDestination);
     }
   }, [currentDestination]);
@@ -101,27 +109,13 @@ export function ThreeSimulationCanvas({
   }, [showGrid]);
 
   return (
-    <div className="three-canvas-wrapper w-full h-full relative min-h-[460px] overflow-hidden">
+    <div className="three-canvas-wrapper" style={{ width: '100%', height: '100%', position: 'absolute', top: 0, left: 0, overflow: 'hidden' }}>
       {/* Three.js WebGL Mount Target */}
       <div 
         ref={containerRef} 
-        className="w-full h-full min-h-[460px]"
-        style={{ touchAction: 'none' }}
+        className="three-canvas-mount"
+        style={{ width: '100%', height: '100%', display: 'block', touchAction: 'none' }}
       />
-
-      {/* Floating 3D Interaction HUD Helper */}
-      <div className="absolute bottom-3 right-3 pointer-events-none bg-slate-900/85 backdrop-blur-md px-3 py-1.5 rounded-lg border border-slate-700/80 text-[11px] text-slate-300 flex items-center gap-2 shadow-xl">
-        <span className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-        <span>
-          {cameraMode === 'follow' 
-            ? 'Camera: Following NaviBot' 
-            : cameraMode === 'grid' 
-            ? 'Camera: 2D Tactical Radar' 
-            : 'Orbit: Left-drag | Pan: Right-drag | Zoom: Scroll'}
-        </span>
-        <span className="text-slate-500">|</span>
-        <span className="text-amber-300 font-medium">Click ground to place hazard</span>
-      </div>
     </div>
   );
 }

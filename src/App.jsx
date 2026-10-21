@@ -233,7 +233,15 @@ export function App() {
     <div className="hud-fullscreen-wrapper">
       {/* 1. Underlying Fullscreen 3D Campus Simulation (Bright sunny daytime campus with fountain, barricade, cyber path) */}
       <div className="simulation-background-viewport">
-        <ThreeSimulationCanvas />
+        <ThreeSimulationCanvas 
+          status={status}
+          currentDestination={currentDestination}
+          robotPosition={robotPosition}
+          obstacles={obstacles}
+          activeRoute={activeRoute}
+          onAddObstacleAtClick={(pos) => addObstacle(pos)}
+          onRemoveObstacle={(id) => removeObstacle(id)}
+        />
       </div>
 
       {/* 2. Floating Glassmorphic HUD Card Layer Matching Reference Image Layout */}

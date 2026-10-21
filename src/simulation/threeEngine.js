@@ -958,7 +958,11 @@ export class ThreeEngine {
     ctx.strokeStyle = '#ffffff';
     ctx.lineWidth = 4;
     ctx.beginPath();
-    ctx.roundRect(8, 8, 368, 80, 20);
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(8, 8, 368, 80, 20);
+    } else {
+      ctx.rect(8, 8, 368, 80);
+    }
     ctx.fill();
     ctx.stroke();
 

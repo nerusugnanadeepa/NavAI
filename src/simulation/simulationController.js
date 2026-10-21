@@ -64,25 +64,38 @@ export const INITIAL_ROBOT_POSITION = {
   heading: 45
 };
 
+export const INITIAL_OBSTACLES = [
+  { id: 'obs-barricade', grid: { x: 7, y: 9 }, world: { x: -2.8, y: 0, z: 0.5 }, label: 'Road Barricade' }
+];
+
+export const INITIAL_ROUTE = [
+  { grid: { x: 5, y: 14 }, world: { x: -5, y: 0, z: 5.5 } },
+  { grid: { x: 6, y: 13 }, world: { x: -4, y: 0, z: 3 } },
+  { grid: { x: 7, y: 11 }, world: { x: -1, y: 0, z: 1.5 } },
+  { grid: { x: 9, y: 9 }, world: { x: 1.5, y: 0, z: 0 } },
+  { grid: { x: 10, y: 7 }, world: { x: 2.5, y: 0, z: -2 } },
+  { grid: { x: 10, y: 4 }, world: { x: 2, y: 0, z: -5.5 } },
+  { grid: { x: 10, y: 2 }, world: { x: 0.8, y: 0, z: -8 } },
+  { grid: { x: 10, y: 0 }, world: { x: 0, y: 0, z: -10 } }
+];
+
 export class SimulationController {
   constructor() {
     this.state = {
-      status: 'idle', // 'idle' | 'planning' | 'moving' | 'avoiding_obstacle' | 'arrived' | 'no_route' | 'paused'
-      currentDestination: null,
+      status: 'avoiding_obstacle', // Matches reference picture active detour state
+      currentDestination: DESTINATIONS[0], // Library
       robotPosition: { ...INITIAL_ROBOT_POSITION },
-      activeRoute: [], // Array of waypoints [{grid: {x, y}, world: {x, y, z}}]
-      progressPercent: 0,
-      obstacles: [
-        { id: 'obs-barricade', grid: { x: 7, y: 9 }, world: { x: -2.8, y: 0, z: 0.5 }, label: 'Road Barricade' }
-      ],
+      activeRoute: [...INITIAL_ROUTE],
+      progressPercent: 15,
+      obstacles: [...INITIAL_OBSTACLES],
       speed: 1.0,
-      isObstacleDetected: false,
+      isObstacleDetected: true,
       blockedSegment: null,
       stats: {
-        waypointsRemaining: 0,
-        totalWaypoints: 0,
-        distanceTraveled: 0,
-        speedMps: 1.2,
+        waypointsRemaining: INITIAL_ROUTE.length,
+        totalWaypoints: INITIAL_ROUTE.length,
+        distanceTraveled: 1.2,
+        speedMps: 0.8,
         batteryPercent: 94
       }
     };
@@ -97,6 +110,12 @@ export class SimulationController {
 
   attachEngine(delegate) {
     this.engineDelegate = delegate;
+    if (delegate) {
+      if (delegate.syncObstacles) delegate.syncObstacles(this.state.obstacles);
+      if (delegate.updateRobotPose) delegate.updateRobotPose(this.state.robotPosition);
+      if (delegate.updateDestination) delegate.updateDestination(this.state.currentDestination);
+      if (delegate.syncRoute) delegate.syncRoute(this.state.activeRoute, this.state.status);
+    }
   }
 
   subscribe(listener) {
@@ -114,6 +133,22 @@ export class SimulationController {
         console.error('Error notifying simulation listener:', err);
       }
     });
+
+    // Directly sync 3D Three.js engine delegate
+    if (this.engineDelegate) {
+      if (currentState.robotPosition && this.engineDelegate.updateRobotPose) {
+        this.engineDelegate.updateRobotPose(currentState.robotPosition);
+      }
+      if (currentState.activeRoute && this.engineDelegate.syncRoute) {
+        this.engineDelegate.syncRoute(currentState.activeRoute, currentState.status);
+      }
+      if (currentState.obstacles && this.engineDelegate.syncObstacles) {
+        this.engineDelegate.syncObstacles(currentState.obstacles);
+      }
+      if (this.engineDelegate.updateDestination) {
+        this.engineDelegate.updateDestination(currentState.currentDestination);
+      }
+    }
   }
 
   getState() {
