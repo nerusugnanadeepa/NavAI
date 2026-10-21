@@ -112,11 +112,14 @@ export class SpeechInputEngine {
       })) {
         const destNames = {
           library: 'Library',
-          classroom: 'Classroom Block',
           cafeteria: 'Cafeteria',
+          computer_lab: 'Computer Lab',
+          classroom: 'Computer Lab',
+          auditorium: 'Auditorium',
           main_gate: 'Main Gate'
         };
-        return { type: 'NAVIGATE_TO', destinationId: destId, name: destNames[destId] };
+        const actualDestId = destId === 'classroom' ? 'computer_lab' : destId;
+        return { type: 'NAVIGATE_TO', destinationId: actualDestId, name: destNames[destId] };
       }
     }
 

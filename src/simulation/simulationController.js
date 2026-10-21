@@ -11,47 +11,57 @@ export const DESTINATIONS = [
     name: 'Library',
     category: 'Academic Hub',
     description: 'Central campus library & study commons',
-    gridPos: { x: 16, y: 4 },
-    worldPos: { x: 6, y: 0, z: -6 },
+    gridPos: { x: 10, y: 2 },
+    worldPos: { x: 0, y: 0, z: -10 },
     color: '#3B82F6',
-    estimatedDist: '14.2m'
-  },
-  {
-    id: 'classroom',
-    name: 'Classroom Block',
-    category: 'Lecture Halls',
-    description: 'Engineering & Computing classrooms',
-    gridPos: { x: 4, y: 16 },
-    worldPos: { x: -6, y: 0, z: 6 },
-    color: '#06B6D4',
-    estimatedDist: '16.8m'
+    estimatedDist: '25m'
   },
   {
     id: 'cafeteria',
     name: 'Cafeteria',
     category: 'Dining Commons',
     description: 'Campus cafeteria & student pavilion',
-    gridPos: { x: 16, y: 16 },
-    worldPos: { x: 6, y: 0, z: 6 },
+    gridPos: { x: 3, y: 8 },
+    worldPos: { x: -9, y: 0, z: -2 },
+    color: '#F59E0B',
+    estimatedDist: '12m'
+  },
+  {
+    id: 'computer_lab',
+    name: 'Computer Lab',
+    category: 'Computing Center',
+    description: 'High-performance AI & Computing labs',
+    gridPos: { x: 17, y: 7 },
+    worldPos: { x: 9, y: 0, z: -3 },
+    color: '#06B6D4',
+    estimatedDist: '18m'
+  },
+  {
+    id: 'auditorium',
+    name: 'Auditorium',
+    category: 'Events & Lectures',
+    description: 'Main campus auditorium & conference hall',
+    gridPos: { x: 17, y: 16 },
+    worldPos: { x: 9, y: 0, z: 8 },
     color: '#A855F7',
-    estimatedDist: '21.5m'
+    estimatedDist: '22m'
   },
   {
     id: 'main_gate',
     name: 'Main Gate',
     category: 'Campus Entry',
-    description: 'North visitor entrance and transit dock',
-    gridPos: { x: 10, y: 2 },
-    worldPos: { x: 0, y: 0, z: -8 },
+    description: 'South stone archway and visitor entrance',
+    gridPos: { x: 3, y: 16 },
+    worldPos: { x: -8, y: 0, z: 8 },
     color: '#10B981',
-    estimatedDist: '9.4m'
+    estimatedDist: '15m'
   }
 ];
 
 export const INITIAL_ROBOT_POSITION = {
-  grid: { x: 10, y: 10 },
-  world: { x: 0, y: 0, z: 0 },
-  heading: 0
+  grid: { x: 5, y: 14 },
+  world: { x: -5, y: 0, z: 5.5 },
+  heading: 45
 };
 
 export class SimulationController {
@@ -63,7 +73,7 @@ export class SimulationController {
       activeRoute: [], // Array of waypoints [{grid: {x, y}, world: {x, y, z}}]
       progressPercent: 0,
       obstacles: [
-        { id: 'obs-1', grid: { x: 13, y: 7 }, world: { x: 3, y: 0, z: -3 }, label: 'Maintenance Barrier' }
+        { id: 'obs-barricade', grid: { x: 7, y: 9 }, world: { x: -2.8, y: 0, z: 0.5 }, label: 'Road Barricade' }
       ],
       speed: 1.0,
       isObstacleDetected: false,
@@ -122,7 +132,18 @@ export class SimulationController {
     this.notify();
   }
 
+  getLocationDescription() {
+    const { world } = this.state.robotPosition;
+    if (world.z < -6) return 'Near Library';
+    if (world.x < -3 && world.z < 2 && world.z > -4) return 'Near Cafeteria';
+    if (world.x < -3 && world.z >= 2) return 'Near Main Gate';
+    if (world.x > 3 && world.z < 2) return 'Near Computer Lab';
+    if (world.x > 3 && world.z >= 2) return 'Near Auditorium';
+    return 'Central Plaza Fountain';
+  }
+
   selectDestination(destinationId) {
+    if (destinationId === 'classroom') destinationId = 'computer_lab';
     const dest = DESTINATIONS.find((d) => d.id === destinationId);
     if (!dest) return null;
 

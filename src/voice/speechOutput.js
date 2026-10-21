@@ -84,14 +84,25 @@ class SpeechOutputEngine {
     this.speak(text, true);
   }
 
-  speakObstacleDetected() {
-    const text = this.getTexts().speech.obstacleDetected();
+  speakObstacleDetected(destinationName = 'Library', direction = 'right') {
+    const speechFn = this.getTexts().speech.obstacleDetected;
+    const text = typeof speechFn === 'function' ? speechFn(destinationName, direction) : 'Obstacle ahead. Recalculating route.';
     this.speak(text, true);
+    return text;
   }
 
-  speakRouteRecalculated() {
-    const text = this.getTexts().speech.routeRecalculated();
+  speakTurnGuidance(direction = 'right', landmark = 'Library') {
+    const speechFn = this.getTexts().speech.turnGuidance;
+    const text = typeof speechFn === 'function' ? speechFn(direction, landmark) : `Turn ${direction} towards ${landmark}.`;
+    this.speak(text, false);
+    return text;
+  }
+
+  speakRouteRecalculated(destinationName = 'Library') {
+    const speechFn = this.getTexts().speech.routeRecalculated;
+    const text = typeof speechFn === 'function' ? speechFn(destinationName) : 'Alternative route calculated.';
     this.speak(text, true);
+    return text;
   }
 
   speakDestinationReached(destinationName) {

@@ -26,7 +26,8 @@ export function useSimulation() {
     moveBackward: (steps) => simulationController.moveBackward(steps),
     turnLeft: () => simulationController.turnLeft(),
     turnRight: () => simulationController.turnRight(),
-    executeCommand: (cmd) => simulationController.executeCommand(cmd)
+    executeCommand: (cmd) => simulationController.executeCommand(cmd),
+    getLocationDescription: () => simulationController.getLocationDescription()
   };
 }
 

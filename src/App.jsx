@@ -1,39 +1,39 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import confetti from 'canvas-confetti';
 import { 
-  AppHeader 
-} from './components/AppHeader';
+  LeftSidebar 
+} from './components/LeftSidebar';
 import { 
-  DestinationSelector 
-} from './components/DestinationSelector';
+  RobotStatusCard 
+} from './components/RobotStatusCard';
 import { 
-  SimulationControls 
-} from './components/SimulationControls';
+  TopViewMinimap 
+} from './components/TopViewMinimap';
 import { 
-  RobotStatus 
-} from './components/RobotStatus';
+  NavigationControlsCard 
+} from './components/NavigationControlsCard';
 import { 
-  SimulationViewport 
-} from './components/SimulationViewport';
-import { 
-  ThreeSimulationCanvas 
-} from './components/ThreeSimulationCanvas';
-import { 
-  ObstacleAlert 
-} from './components/ObstacleAlert';
-import { 
-  EventLog 
-} from './components/EventLog';
+  CameraViewCard 
+} from './components/CameraViewCard';
 import { 
   VoiceAssistant 
 } from './components/VoiceAssistant';
 import { 
+  ThreeSimulationCanvas 
+} from './components/ThreeSimulationCanvas';
+import { 
+  DestinationSelector 
+} from './components/DestinationSelector';
+import { 
   WelcomeModal 
 } from './components/WelcomeModal';
+import { CommandBar } from './components/CommandBar';
 import { useSimulation } from './hooks/useSimulation';
 import { speechOutput } from './voice/speechOutput';
 import { speechInput } from './voice/speechInput';
-import { SUPPORTED_LANGUAGES } from './voice/languages';
+import { SUPPORTED_LANGUAGES, LANGUAGE_UI_TEXTS } from './voice/languages';
+import { simulationController } from './simulation/simulationController';
+import { X, HelpCircle, Volume2, VolumeX } from 'lucide-react';
 import './App.css';
 
 export function App() {
@@ -60,62 +60,41 @@ export function App() {
     moveBackward,
     turnLeft,
     turnRight,
-    executeCommand
+    executeCommand,
+    getLocationDescription
   } = useSimulation();
 
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [isMuted, setIsMuted] = useState(false);
-  const [isListening, setIsListening] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
-  const [events, setEvents] = useState([
-    {
-      id: 1,
-      time: new Date().toLocaleTimeString(),
-      type: 'system',
-      message: 'NaviAI Autonomous Navigation System initialized.'
-    },
-    {
-      id: 2,
-      time: new Date().toLocaleTimeString(),
-      type: 'route',
-      message: 'Grid environment loaded. Standing by for destination selection.'
-    }
-  ]);
+  const [showDestinationsModal, setShowDestinationsModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('map');
+  const [guidanceText, setGuidanceText] = useState(
+    'Obstacle ahead. Recalculating route.\nTurn right and continue towards Library.'
+  );
 
   const prevStatusRef = useRef(status);
 
-  // Helper to append events
-  const addLogEvent = useCallback((message, type = 'system') => {
-    setEvents((prev) => [
-      ...prev,
-      {
-        id: Date.now() + Math.random(),
-        time: new Date().toLocaleTimeString(),
-        type,
-        message
-      }
-    ]);
-  }, []);
-
-  // Sync Voice guidance with simulation state transitions
+  // Sync Voice guidance & announcements with simulation state transitions
   useEffect(() => {
     const prev = prevStatusRef.current;
     if (prev === status) return;
 
-    if (status === 'planning' && currentDestination) {
-      addLogEvent(`Planning collision-aware route to ${currentDestination.name}.`, 'route');
-      speechOutput.speakNavStarted(currentDestination.name);
-    } else if (status === 'moving' && prev === 'planning') {
-      addLogEvent(`Autonomous movement started along computed path.`, 'nav');
+    const destName = currentDestination?.name || 'Library';
+
+    if (status === 'planning') {
+      speechOutput.speakNavStarted(destName);
+      setGuidanceText(`Calculating collision-free path towards ${destName}...`);
     } else if (status === 'avoiding_obstacle') {
-      addLogEvent(`Obstacle detected! Recalculating collision-free path.`, 'alert');
-      speechOutput.speakObstacleDetected();
+      // Robot encounters obstacle: announce detection + detour direction
+      const text = speechOutput.speakObstacleDetected(destName, 'right');
+      setGuidanceText(text);
     } else if (status === 'moving' && prev === 'avoiding_obstacle') {
-      addLogEvent(`Alternative route found. Continuing navigation.`, 'route');
-      speechOutput.speakRouteRecalculated();
-    } else if (status === 'arrived' && currentDestination) {
-      addLogEvent(`Successfully reached ${currentDestination.name}!`, 'success');
-      speechOutput.speakDestinationReached(currentDestination.name);
+      const text = speechOutput.speakTurnGuidance('right', destName);
+      setGuidanceText(text);
+    } else if (status === 'arrived') {
+      speechOutput.speakDestinationReached(destName);
+      setGuidanceText(`Destination reached: ${destName}. Navigation completed!`);
       try {
         confetti({
           particleCount: 80,
@@ -123,95 +102,47 @@ export function App() {
           origin: { y: 0.6 }
         });
       } catch (err) {
-        // silent fail if confetti context not ready
+        // silent fail
       }
     } else if (status === 'no_route') {
-      addLogEvent(`No safe route available. Halting robot in simulation.`, 'alert');
       speechOutput.speakNoRoute();
+      setGuidanceText('Path is blocked. No safe route found.');
     } else if (status === 'paused') {
-      addLogEvent(`Navigation paused by user.`, 'nav');
       speechOutput.speakPaused();
     } else if (status === 'moving' && prev === 'paused') {
-      addLogEvent(`Navigation resumed.`, 'nav');
       speechOutput.speakResumed();
     }
 
     prevStatusRef.current = status;
-  }, [status, currentDestination, addLogEvent]);
+  }, [status, currentDestination]);
 
   // Handle destination choice
   const handleSelectDestination = (destId) => {
     const dest = selectDestination(destId);
     if (dest) {
-      addLogEvent(`Human command: Navigating to ${dest.name} (${dest.category}).`, 'nav');
+      setShowDestinationsModal(false);
       startNavigation(destId);
     }
   };
 
   // Handle Start
   const handleStartNavigation = () => {
-    if (!currentDestination) return;
-    addLogEvent(`Starting navigation to ${currentDestination.name}.`, 'nav');
-    startNavigation();
-  };
-
-  // Handle Obstacle Add
-  const handleAddObstacle = () => {
-    addObstacle();
-    addLogEvent(`Simulated obstacle placed on active campus grid.`, 'obstacle');
-  };
-
-  // Handle Clear Obstacles
-  const handleClearObstacles = () => {
-    clearObstacles();
-    addLogEvent(`Cleared simulated obstacles.`, 'obstacle');
+    if (!currentDestination) {
+      // default destination is Library if none selected yet
+      selectDestination('library');
+    }
+    startNavigation('library');
   };
 
   // Handle Reset
   const handleResetSimulation = () => {
     resetSimulation();
     speechOutput.speakSimulationReset();
-    addLogEvent(`Simulation reset to origin dock.`, 'reset');
+    setGuidanceText('Simulation reset. Standing by for destination selection.');
   };
 
-  // Handle Voice Mute
-  const handleToggleMute = () => {
-    const next = !isMuted;
-    setIsMuted(next);
-    speechOutput.setMuted(next);
-  };
-
-  // Handle Header mic toggle
-  const handleToggleHeaderVoice = () => {
-    if (!speechInput.isSupported()) {
-      addLogEvent('Speech recognition not supported in browser. Use typing in command bar.', 'alert');
-      return;
-    }
-    if (isListening) {
-      speechInput.stopListening();
-      setIsListening(false);
-    } else {
-      setIsListening(true);
-      speechInput.startListening(
-        ({ transcript: heardText, command }) => {
-          setIsListening(false);
-          handleVoiceCommand(command, heardText);
-        },
-        ({ state }) => {
-          setIsListening(state === 'listening');
-        },
-        (err) => {
-          setIsListening(false);
-          addLogEvent(`Mic notice: ${err}`, 'alert');
-        }
-      );
-    }
-  };
-
-  // Handle Voice / Text Assistant Command
+  // Handle Voice / Command execution across all 6 languages
   const handleVoiceCommand = (command, transcript) => {
-    addLogEvent(`Command heard/entered: "${transcript}"`, 'voice');
-
     if (!command) return;
 
     switch (command.type) {
@@ -219,36 +150,35 @@ export function App() {
       case 'SELECT_DESTINATION': {
         const dest = selectDestination(command.destinationId);
         if (dest) {
-          addLogEvent(`Command executed: Driving to ${dest.name}.`, 'nav');
           startNavigation(command.destinationId);
         }
         break;
       }
       case 'MOVE_FORWARD': {
         const moved = moveForward();
-        addLogEvent(moved ? `Command executed: Moving forward.` : `Obstacle ahead! Cannot move forward.`, moved ? 'nav' : 'alert');
+        if (!moved) {
+          const spoken = speechOutput.speakObstacleDetected(currentDestination?.name || 'Library', 'right');
+          setGuidanceText(spoken);
+        }
         break;
       }
       case 'MOVE_BACKWARD': {
-        const moved = moveBackward();
-        addLogEvent(moved ? `Command executed: Reversing backward.` : `Obstacle behind! Cannot reverse.`, moved ? 'nav' : 'alert');
+        moveBackward();
         break;
       }
       case 'TURN_LEFT':
         turnLeft();
-        addLogEvent(`Command executed: Turned left 90°.`, 'nav');
+        setGuidanceText('Turned left 90°.');
         break;
       case 'TURN_RIGHT':
         turnRight();
-        addLogEvent(`Command executed: Turned right 90°.`, 'nav');
+        setGuidanceText('Turned right 90°.');
         break;
       case 'SPEED_UP':
         setSpeed(Math.min(3.0, (speed || 1.0) + 0.5));
-        addLogEvent(`Command executed: Speed increased.`, 'nav');
         break;
       case 'SLOW_DOWN':
         setSpeed(Math.max(0.5, (speed || 1.0) - 0.5));
-        addLogEvent(`Command executed: Speed decreased.`, 'nav');
         break;
       case 'START_NAVIGATION':
         handleStartNavigation();
@@ -263,13 +193,13 @@ export function App() {
         handleResetSimulation();
         break;
       case 'ADD_OBSTACLE':
-        handleAddObstacle();
+        addObstacle();
         break;
       case 'REMOVE_OBSTACLE':
-        handleClearObstacles();
+        clearObstacles();
         break;
       default:
-        addLogEvent(`Voice command not recognized. Please use sample phrases.`, 'voice');
+        break;
     }
   };
 
@@ -277,112 +207,163 @@ export function App() {
     setCurrentLanguage(langCode);
     speechInput.setLanguage(langCode);
     speechOutput.setLanguage(langCode);
-    const langObj = SUPPORTED_LANGUAGES.find(l => l.code === langCode);
-    addLogEvent(`System language set to ${langObj?.name || langCode} (${langObj?.native || ''}).`, 'system');
+
+    const uiTexts = LANGUAGE_UI_TEXTS[langCode] || LANGUAGE_UI_TEXTS.en;
+    if (status === 'avoiding_obstacle' && uiTexts.speech?.obstacleDetected) {
+      const text = uiTexts.speech.obstacleDetected(currentDestination?.name || 'Library', 'right');
+      setGuidanceText(text);
+    }
   };
 
+  const handleToggleMute = () => {
+    const next = !isMuted;
+    setIsMuted(next);
+    speechOutput.setMuted(next);
+  };
+
+  // Location and metrics
+  const locDescription = getLocationDescription ? getLocationDescription() : 'Near Cafeteria';
+  const targetWorld = currentDestination?.worldPos || { x: 0, z: -10 };
+  const curWorld = robotPosition?.world || { x: -5, z: 5.5 };
+  const distMeters = Math.max(0, Math.round(Math.hypot(targetWorld.x - curWorld.x, targetWorld.z - curWorld.z) * 1.5));
+  const distanceLeft = `${distMeters} m`;
+  const speedStr = `${(speed * 0.8).toFixed(1)} m/s`;
+
   return (
-    <div className="app-container">
-      {/* Header with Command Bar & Language Selector */}
-      <AppHeader
-        status={status}
-        isMuted={isMuted}
-        onToggleMute={handleToggleMute}
-        onOpenHelp={() => setShowWelcome(true)}
-        stats={stats}
-        onExecuteCommand={(cmdStr) => {
-          const parsed = speechInput.parseCommand(cmdStr);
-          handleVoiceCommand(parsed, cmdStr);
-        }}
-        isListening={isListening}
-        onToggleVoice={handleToggleHeaderVoice}
-        currentLanguage={currentLanguage}
-        onSelectLanguage={handleSelectLanguage}
-      />
+    <div className="hud-fullscreen-wrapper">
+      {/* 1. Underlying Fullscreen 3D Campus Simulation (Bright sunny daytime campus with fountain, barricade, cyber path) */}
+      <div className="simulation-background-viewport">
+        <ThreeSimulationCanvas />
+      </div>
 
-      {/* Main Responsive Grid Layout */}
-      <main className="dashboard-layout">
-        {/* Left Column: Destination & Voice Input */}
-        <div className="dashboard-col">
-          <DestinationSelector
-            currentDestination={currentDestination}
-            onSelect={handleSelectDestination}
-            disabled={status === 'moving' || status === 'avoiding_obstacle'}
-            currentLanguage={currentLanguage}
-          />
+      {/* 2. Floating Glassmorphic HUD Card Layer Matching Reference Image Layout */}
+      <div className="hud-overlay-container">
+        {/* Top Command Bar & Utility Controls */}
+        <div className="hud-top-command-bar">
+          <div className="flex-1 max-w-xl">
+            <CommandBar
+              onExecuteCommand={(cmdStr) => {
+                const parsed = speechInput.parseCommand(cmdStr);
+                handleVoiceCommand(parsed, cmdStr);
+              }}
+              currentLanguage={currentLanguage}
+            />
+          </div>
 
-          <VoiceAssistant 
-            onCommandRecognized={handleVoiceCommand}
-            currentLanguage={currentLanguage}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              className="hud-mini-btn"
+              onClick={handleToggleMute}
+              title={isMuted ? 'Unmute voice guidance' : 'Mute voice guidance'}
+            >
+              {isMuted ? <VolumeX size={15} className="text-red-400" /> : <Volume2 size={15} className="text-cyan-400" />}
+            </button>
+            <button
+              type="button"
+              className="hud-mini-btn"
+              onClick={() => setShowWelcome(true)}
+              title="Help & System Info"
+            >
+              <HelpCircle size={15} />
+            </button>
+          </div>
+        </div>
+
+        {/* Top-Left: Brand Card + Vertical Navigation Menu */}
+        <div className="left-sidebar-stack">
+          <LeftSidebar
+            activeTab={activeTab}
+            onSelectTab={(tab) => {
+              setActiveTab(tab);
+              if (tab === 'destinations') setShowDestinationsModal(true);
+              if (tab === 'start') handleStartNavigation();
+              if (tab === 'settings') setShowWelcome(true);
+            }}
+            onOpenDestinations={() => setShowDestinationsModal(true)}
+            onStartNavigation={handleStartNavigation}
+            onToggleVoice={() => {}}
           />
         </div>
 
-        {/* Center Column: 3D Simulation Viewport & Controls */}
-        <div className="dashboard-center">
-          {/* Obstacle / Status Alert Banner */}
-          <ObstacleAlert
+        {/* Top-Right: Robot Status Card with Language Selector Dropdown */}
+        <div className="hud-top-right-anchor">
+          <RobotStatusCard
             status={status}
-            isObstacleDetected={isObstacleDetected}
             currentDestination={currentDestination}
+            locationDescription={locDescription}
+            distanceLeft={distanceLeft}
+            speed={speedStr}
+            currentLanguage={currentLanguage}
+            onSelectLanguage={handleSelectLanguage}
           />
+        </div>
 
-          {/* 3D Simulation Viewport (Where Agent 2 mounts Three.js) */}
-          <SimulationViewport
-            status={status}
-            currentDestination={currentDestination}
+        {/* Bottom-Left: Campus Map (Top View) with route & obstacle */}
+        <div className="hud-bottom-left-anchor">
+          <TopViewMinimap
             robotPosition={robotPosition}
+            currentDestination={currentDestination}
             obstacles={obstacles}
             activeRoute={activeRoute}
-            onAddObstacleAtClick={(pos) => {
-              addObstacle(pos);
-              addLogEvent(`Simulated obstacle placed at [${pos.grid.x}, ${pos.grid.y}].`, 'obstacle');
-            }}
-            onRemoveObstacle={(id) => {
-              removeObstacle(id);
-              addLogEvent(`Obstacle removed from simulation.`, 'obstacle');
-            }}
-          >
-            <ThreeSimulationCanvas />
-          </SimulationViewport>
+            status={status}
+          />
+        </div>
 
-          {/* Simulation Controls Cluster */}
-          <SimulationControls
+        {/* Bottom-Center: Navigation Controls (Start, Pause, Stop, Reset) */}
+        <div className="hud-bottom-center-anchor">
+          <NavigationControlsCard
             status={status}
             hasDestination={Boolean(currentDestination)}
             onStart={handleStartNavigation}
             onPause={pauseNavigation}
             onResume={resumeNavigation}
             onReset={handleResetSimulation}
-            onAddObstacle={handleAddObstacle}
-            onClearObstacles={handleClearObstacles}
-            onMoveForward={() => handleVoiceCommand({ type: 'MOVE_FORWARD' }, 'move forward')}
-            onMoveBackward={() => handleVoiceCommand({ type: 'MOVE_BACKWARD' }, 'move backward')}
-            onTurnLeft={() => handleVoiceCommand({ type: 'TURN_LEFT' }, 'turn left')}
-            onTurnRight={() => handleVoiceCommand({ type: 'TURN_RIGHT' }, 'turn right')}
-            speed={speed}
-            onSetSpeed={setSpeed}
-            obstacleCount={obstacles.length}
           />
         </div>
 
-        {/* Right Column: Telemetry & Event Log */}
-        <div className="dashboard-col dashboard-right">
-          <RobotStatus
+        {/* Bottom-Right: Camera View (Object Detection) & Voice Assistant Stack */}
+        <div className="hud-bottom-right-anchor">
+          <CameraViewCard
+            isObstacleDetected={isObstacleDetected || status === 'avoiding_obstacle'}
+            currentDestination={currentDestination}
+          />
+
+          <VoiceAssistant
+            guidanceText={guidanceText}
+            currentLanguage={currentLanguage}
             status={status}
             currentDestination={currentDestination}
-            robotPosition={robotPosition}
-            progressPercent={progressPercent}
-            stats={stats}
-          />
-
-          <EventLog
-            events={events}
-            onClear={() => setEvents([])}
+            onCommandRecognized={handleVoiceCommand}
           />
         </div>
-      </main>
+      </div>
 
-      {/* Demo Welcome Modal */}
+      {/* Select Destination Modal (Opened when clicking 'Select Destination' in menu) */}
+      {showDestinationsModal && (
+        <div className="destination-modal-overlay" onClick={() => setShowDestinationsModal(false)}>
+          <div className="destination-modal-card" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between pb-2 border-b border-slate-700">
+              <h3 className="font-bold text-base text-white">Select Navigation Destination</h3>
+              <button 
+                type="button" 
+                className="hud-mini-btn"
+                onClick={() => setShowDestinationsModal(false)}
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <DestinationSelector
+              currentDestination={currentDestination}
+              onSelect={handleSelectDestination}
+              disabled={status === 'moving' || status === 'avoiding_obstacle'}
+              currentLanguage={currentLanguage}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Welcome / Help Modal */}
       <WelcomeModal
         isOpen={showWelcome}
         onClose={() => setShowWelcome(false)}

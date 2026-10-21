@@ -4,8 +4,13 @@ import { DESTINATIONS, simulationController } from './simulationController';
 
 /**
  * NaviAI 3D Three.js Simulation Engine (Agent 2)
- * Renders interactive 3D campus, procedural buildings, animated AMR robot,
- * hazard pylons, dynamic A* path ribbons, holographic beacons, and raycasting.
+ * Renders high-fidelity sunny campus environment matching reference design:
+ * - Library, Cafeteria, Computer Lab, Auditorium, Main Gate with 3D signboards
+ * - Centerpiece tiered stone Water Fountain with animated splashing water particles
+ * - Manicured green lawns, paved limestone plazas, deciduous trees, hedges, lamp posts, benches
+ * - 4WD white autonomous rover with cyan glowing rim rings, spinning LiDAR, and forward POV camera
+ * - Red plastic Jersey highway road barricades with floating "Obstacle Detected" alert badge
+ * - Glowing cyan navigation path with animated directional arrows & green destination pin
  */
 export class ThreeEngine {
   constructor(container, callbacks = {}) {
@@ -14,6 +19,7 @@ export class ThreeEngine {
 
     this.scene = null;
     this.camera = null;
+    this.povCamera = null;
     this.renderer = null;
     this.controls = null;
     this.clock = new THREE.Clock();
@@ -30,15 +36,17 @@ export class ThreeEngine {
     this.beaconMeshes = new Map();
     this.obstacleMeshes = new Map();
     this.pathLineMesh = null;
-    this.pathPointsGroup = new THREE.Group();
+    this.pathChevronsGroup = new THREE.Group();
+    this.destinationPin = null;
     this.robotGroup = null;
     this.lidarPuck = null;
     this.robotWheels = [];
     this.hoverPreviewMesh = null;
+    this.fountainParticles = [];
 
     // Animation / State Interpolation
-    this.robotTargetPos = new THREE.Vector3(0, 0, 0);
-    this.robotTargetHeading = 0; // in radians
+    this.robotTargetPos = new THREE.Vector3(-5, 0, 5.5);
+    this.robotTargetHeading = THREE.MathUtils.degToRad(-45 + 180);
     this.activeRoute = [];
     this.currentDestination = null;
     this.status = 'idle';
@@ -47,23 +55,23 @@ export class ThreeEngine {
     this.raycaster = new THREE.Raycaster();
     this.mouse = new THREE.Vector2(-999, -999);
     this.isHoveringGround = false;
-    this.hoveredGrid = { x: 10, y: 10 };
+    this.hoveredGrid = { x: 5, y: 14 };
 
     this.init();
   }
 
   init() {
-    const width = this.container.clientWidth || 800;
-    const height = this.container.clientHeight || 500;
+    const width = this.container.clientWidth || 900;
+    const height = this.container.clientHeight || 560;
 
-    // 1. Scene setup
+    // 1. Scene setup (Bright sunny daylight campus matching reference image)
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color('#070D18');
-    this.scene.fog = new THREE.FogExp2('#070D18', 0.022);
+    this.scene.background = new THREE.Color('#8EC8EE'); // Soft daytime sky blue
+    this.scene.fog = new THREE.FogExp2('#D5E8F7', 0.011);
 
-    // 2. Camera setup
-    this.camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 1000);
-    this.camera.position.set(16, 20, 20);
+    // 2. Camera setup (Elevated diagonal view showing entire campus, plaza, and buildings)
+    this.camera = new THREE.PerspectiveCamera(42, width / height, 0.1, 1000);
+    this.camera.position.set(-11, 17, 21);
 
     // 3. Renderer setup
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false, powerPreference: 'high-performance' });
@@ -72,34 +80,38 @@ export class ThreeEngine {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.1;
+    this.renderer.toneMappingExposure = 1.15;
     this.container.appendChild(this.renderer.domElement);
 
     // 4. Orbit Controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.08;
-    this.controls.maxPolarAngle = Math.PI / 2 - 0.05; // Don't clip below ground
+    this.controls.maxPolarAngle = Math.PI / 2 - 0.08;
     this.controls.minDistance = 6;
     this.controls.maxDistance = 65;
-    this.controls.target.set(0, 0, 0);
+    this.controls.target.set(0, 0.5, -0.5);
 
-    // 5. Lighting
+    // 5. Lighting (Warm sun and sky light)
     this.setupLighting();
 
-    // 6. Ground & Pathways
+    // 6. Ground, Plaza, Pathways & Water Fountain
     this.setupEnvironment();
+    this.setupFountain();
 
-    // 7. Campus Buildings
+    // 7. Campus Buildings with 3D Signboards
     this.setupBuildings();
 
-    // 8. Robot Model
+    // 8. Trees, Benches, Hedges & Street Lamps
+    this.setupSceneryProps();
+
+    // 9. 4WD Autonomous Robot Model
     this.setupRobot();
 
-    // 9. Hover Preview Indicator
+    // 10. Hover Preview Indicator
     this.setupHoverPreview();
 
-    // 10. Event Listeners
+    // 11. Event Listeners
     this.boundOnResize = this.onResize.bind(this);
     this.boundOnPointerMove = this.onPointerMove.bind(this);
     this.boundOnPointerDown = this.onPointerDown.bind(this);
@@ -110,53 +122,59 @@ export class ThreeEngine {
     this.renderer.domElement.addEventListener('pointerdown', this.boundOnPointerDown);
     this.renderer.domElement.addEventListener('pointerleave', this.boundOnPointerLeave);
 
-    // 11. Attach to simulationController as Agent 2 Engine Delegate
+    // 12. Attach to simulationController
     this.attachDelegate();
 
-    // 12. Start Render Loop
+    // 13. Sync initial state
+    const initState = simulationController.getState();
+    if (initState.obstacles) this.syncObstacles(initState.obstacles);
+    if (initState.robotPosition) this.updateRobotPose(initState.robotPosition);
+    if (initState.currentDestination) this.updateDestination(initState.currentDestination);
+
+    // 14. Start Render Loop
     this.animate = this.animate.bind(this);
     this.animate();
   }
 
   setupLighting() {
     // Ambient fill
-    const ambientLight = new THREE.AmbientLight(0x0f172a, 2.0);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.75);
     this.scene.add(ambientLight);
 
-    // Hemisphere sky/ground light
-    const hemiLight = new THREE.HemisphereLight(0x38bdf8, 0x020617, 1.2);
+    // Hemisphere sky/ground bounce light
+    const hemiLight = new THREE.HemisphereLight(0xbae6fd, 0x4a7c29, 1.4);
     hemiLight.position.set(0, 30, 0);
     this.scene.add(hemiLight);
 
-    // Main directional sunlight with soft shadows
-    const dirLight = new THREE.DirectionalLight(0xffffff, 2.2);
-    dirLight.position.set(18, 30, 18);
-    dirLight.castShadow = true;
-    dirLight.shadow.mapSize.width = 2048;
-    dirLight.shadow.mapSize.height = 2048;
-    dirLight.shadow.camera.near = 0.5;
-    dirLight.shadow.camera.far = 80;
-    const shadowDist = 20;
-    dirLight.shadow.camera.left = -shadowDist;
-    dirLight.shadow.camera.right = shadowDist;
-    dirLight.shadow.camera.top = shadowDist;
-    dirLight.shadow.camera.bottom = -shadowDist;
-    dirLight.shadow.bias = -0.0005;
-    this.scene.add(dirLight);
+    // Main directional sunlight with soft PCF shadows
+    const sunLight = new THREE.DirectionalLight(0xfffaec, 2.6);
+    sunLight.position.set(18, 32, 18);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    sunLight.shadow.camera.near = 0.5;
+    sunLight.shadow.camera.far = 90;
+    const shadowDist = 24;
+    sunLight.shadow.camera.left = -shadowDist;
+    sunLight.shadow.camera.right = shadowDist;
+    sunLight.shadow.camera.top = shadowDist;
+    sunLight.shadow.camera.bottom = -shadowDist;
+    sunLight.shadow.bias = -0.0004;
+    this.scene.add(sunLight);
 
-    // Central dock soft cyan glow
-    const dockLight = new THREE.PointLight(0x06b6d4, 2.5, 12, 1.5);
-    dockLight.position.set(0, 1.5, 0);
-    this.scene.add(dockLight);
+    // Secondary soft fill light
+    const fillLight = new THREE.DirectionalLight(0xdbeafe, 0.8);
+    fillLight.position.set(-16, 20, -16);
+    this.scene.add(fillLight);
   }
 
   setupEnvironment() {
-    // Ground plane
-    const groundGeo = new THREE.PlaneGeometry(60, 60);
+    // 1. Manicured Green Grass Lawn
+    const groundGeo = new THREE.PlaneGeometry(80, 80);
     const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x0b1329,
-      roughness: 0.85,
-      metalness: 0.2
+      color: 0x518432, // Lush natural lawn green
+      roughness: 0.92,
+      metalness: 0.05
     });
     this.groundMesh = new THREE.Mesh(groundGeo, groundMat);
     this.groundMesh.rotation.x = -Math.PI / 2;
@@ -164,65 +182,194 @@ export class ThreeEngine {
     this.groundMesh.name = 'campus_ground';
     this.scene.add(this.groundMesh);
 
-    // Tactical Campus Grid
-    this.gridHelper = new THREE.GridHelper(20, 20, 0x06b6d4, 0x1e293b);
+    // 2. Tactical Campus Grid
+    this.gridHelper = new THREE.GridHelper(20, 20, 0x38bdf8, 0x94a3b8);
     this.gridHelper.position.y = 0.02;
+    this.gridHelper.material.opacity = 0.22;
+    this.gridHelper.material.transparent = true;
     this.scene.add(this.gridHelper);
 
-    // Glowing walkways connecting central dock to buildings
-    const pathwayMat = new THREE.MeshBasicMaterial({
-      color: 0x06b6d4,
-      transparent: true,
-      opacity: 0.25,
-      depthWrite: false
+    // 3. Central Paved Sandstone Plaza
+    const plazaGeo = new THREE.CylinderGeometry(5.2, 5.2, 0.04, 48);
+    const pavingMat = new THREE.MeshStandardMaterial({
+      color: 0xe2ded4, // Sandstone paving stones
+      roughness: 0.85,
+      metalness: 0.1
     });
+    const plaza = new THREE.Mesh(plazaGeo, pavingMat);
+    plaza.position.set(0, 0.02, -1);
+    plaza.receiveShadow = true;
+    this.scene.add(plaza);
 
-    const walkwayCoords = [
-      [{ x: 0, z: 0 }, { x: 6, z: -6 }],   // Dock to Library
-      [{ x: 0, z: 0 }, { x: -6, z: 6 }],  // Dock to Classroom
-      [{ x: 0, z: 0 }, { x: 6, z: 6 }],   // Dock to Cafeteria
-      [{ x: 0, z: 0 }, { x: 0, z: -8 }],  // Dock to Main Gate
-      [{ x: 6, z: -6 }, { x: 6, z: 6 }],  // Library to Cafeteria
-      [{ x: -6, z: 6 }, { x: 6, z: 6 }],  // Classroom to Cafeteria
-      [{ x: 0, z: -8 }, { x: 6, z: -6 }]   // Main Gate to Library
+    // Plaza outer dark border kerb
+    const kerbGeo = new THREE.RingGeometry(5.15, 5.35, 48);
+    const kerbMat = new THREE.MeshStandardMaterial({ color: 0xbdb3a6, roughness: 0.8 });
+    const kerb = new THREE.Mesh(kerbGeo, kerbMat);
+    kerb.rotation.x = -Math.PI / 2;
+    kerb.position.set(0, 0.041, -1);
+    this.scene.add(kerb);
+
+    // 4. Wide Paved Walkways Connecting Buildings to Central Plaza
+    const walkwaySegments = [
+      [{ x: -8, z: 8 }, { x: 0, z: -1 }, 2.6],    // Main Gate to Plaza Fountain
+      [{ x: 0, z: -1 }, { x: 0, z: -10 }, 3.0],   // Plaza to Library
+      [{ x: -9, z: -2 }, { x: 0, z: -1 }, 2.6],   // Cafeteria to Plaza
+      [{ x: 9, z: -3 }, { x: 0, z: -1 }, 2.6],    // Computer Lab to Plaza
+      [{ x: 9, z: 8 }, { x: 0, z: -1 }, 2.6],     // Auditorium to Plaza
+      [{ x: -8, z: 8 }, { x: -9, z: -2 }, 2.2],   // Main Gate to Cafeteria
+      [{ x: 9, z: -3 }, { x: 9, z: 8 }, 2.2],     // Computer Lab to Auditorium
+      [{ x: -9, z: -2 }, { x: 0, z: -10 }, 2.2],  // Cafeteria to Library
+      [{ x: 9, z: -3 }, { x: 0, z: -10 }, 2.2]    // Computer Lab to Library
     ];
 
-    walkwayCoords.forEach(([start, end]) => {
+    walkwaySegments.forEach(([start, end, width]) => {
       const dx = end.x - start.x;
       const dz = end.z - start.z;
-      const length = Math.hypot(dx, dz);
+      const len = Math.hypot(dx, dz);
       const angle = Math.atan2(dz, dx);
 
-      const pathGeo = new THREE.PlaneGeometry(length, 0.5);
-      const mesh = new THREE.Mesh(pathGeo, pathwayMat);
-      mesh.rotation.x = -Math.PI / 2;
-      mesh.rotation.z = -angle;
-      mesh.position.set((start.x + end.x) / 2, 0.03, (start.z + end.z) / 2);
-      this.scene.add(mesh);
+      const pathGeo = new THREE.PlaneGeometry(len, width);
+      const pathMesh = new THREE.Mesh(pathGeo, pavingMat);
+      pathMesh.rotation.x = -Math.PI / 2;
+      pathMesh.rotation.z = -angle;
+      pathMesh.position.set((start.x + end.x) / 2, 0.025, (start.z + end.z) / 2);
+      pathMesh.receiveShadow = true;
+      this.scene.add(pathMesh);
     });
 
-    // Central Robot Dock Pad
-    const dockGeo = new THREE.CylinderGeometry(1.6, 1.8, 0.1, 32);
-    const dockMat = new THREE.MeshStandardMaterial({
+    // Add path chevrons group
+    this.scene.add(this.pathChevronsGroup);
+  }
+
+  setupFountain() {
+    const fountainGroup = new THREE.Group();
+    fountainGroup.position.set(0, 0, -1);
+
+    const stoneMat = new THREE.MeshStandardMaterial({
+      color: 0xd6ccc2,
+      roughness: 0.55,
+      metalness: 0.15
+    });
+
+    // 1. Lower circular pool basin rim
+    const basinGeo = new THREE.CylinderGeometry(2.35, 2.5, 0.45, 36);
+    const basin = new THREE.Mesh(basinGeo, stoneMat);
+    basin.position.y = 0.225;
+    basin.castShadow = true;
+    basin.receiveShadow = true;
+    fountainGroup.add(basin);
+
+    // Stone decorative lip
+    const lipGeo = new THREE.TorusGeometry(2.4, 0.12, 12, 36);
+    const lip = new THREE.Mesh(lipGeo, stoneMat);
+    lip.rotation.x = Math.PI / 2;
+    lip.position.y = 0.46;
+    lip.castShadow = true;
+    fountainGroup.add(lip);
+
+    // 2. Clear Blue Shimmering Pool Water
+    const waterGeo = new THREE.CircleGeometry(2.3, 36);
+    const waterMat = new THREE.MeshStandardMaterial({
+      color: 0x38bdf8,
+      roughness: 0.1,
+      metalness: 0.25,
+      transparent: true,
+      opacity: 0.88
+    });
+    const water = new THREE.Mesh(waterGeo, waterMat);
+    water.rotation.x = -Math.PI / 2;
+    water.position.y = 0.38;
+    fountainGroup.add(water);
+
+    // 3. Central Fountain Pedestal
+    const pedGeo = new THREE.CylinderGeometry(0.5, 0.7, 0.85, 20);
+    const ped = new THREE.Mesh(pedGeo, stoneMat);
+    ped.position.y = 0.45 + 0.425;
+    ped.castShadow = true;
+    fountainGroup.add(ped);
+
+    // 4. Upper Water Basin Bowl
+    const bowlGeo = new THREE.CylinderGeometry(1.05, 0.6, 0.32, 24);
+    const bowl = new THREE.Mesh(bowlGeo, stoneMat);
+    bowl.position.y = 1.3 + 0.16;
+    bowl.castShadow = true;
+    fountainGroup.add(bowl);
+
+    // Upper pool water
+    const upperWaterGeo = new THREE.CircleGeometry(1.0, 24);
+    const upperWater = new THREE.Mesh(upperWaterGeo, waterMat);
+    upperWater.rotation.x = -Math.PI / 2;
+    upperWater.position.y = 1.62;
+    fountainGroup.add(upperWater);
+
+    // Center Spout Nozzle
+    const spoutGeo = new THREE.CylinderGeometry(0.12, 0.18, 0.45, 16);
+    const spout = new THREE.Mesh(spoutGeo, stoneMat);
+    spout.position.y = 1.62 + 0.225;
+    spout.castShadow = true;
+    fountainGroup.add(spout);
+
+    // 5. Animated Splashing Water Particles
+    this.fountainParticles = [];
+    const particleCount = 44;
+    const particleGeo = new THREE.SphereGeometry(0.045, 8, 8);
+    const particleMat = new THREE.MeshBasicMaterial({
+      color: 0xe0f2fe,
+      transparent: true,
+      opacity: 0.9
+    });
+
+    for (let i = 0; i < particleCount; i++) {
+      const p = new THREE.Mesh(particleGeo, particleMat);
+      const angle = (i / particleCount) * Math.PI * 2;
+      p.userData = {
+        angle,
+        speed: 0.6 + (i % 5) * 0.15,
+        progress: (i / particleCount),
+        radiusMax: 0.5 + (i % 3) * 0.35
+      };
+      fountainGroup.add(p);
+      this.fountainParticles.push(p);
+    }
+
+    this.scene.add(fountainGroup);
+  }
+
+  createSignboardMesh(text, width = 2.4, height = 0.55) {
+    const group = new THREE.Group();
+
+    // Dark slate backing plate
+    const plateGeo = new THREE.BoxGeometry(width, height, 0.08);
+    const plateMat = new THREE.MeshStandardMaterial({
       color: 0x0f172a,
-      roughness: 0.5,
-      metalness: 0.8
+      roughness: 0.35,
+      metalness: 0.7
     });
-    const dockMesh = new THREE.Mesh(dockGeo, dockMat);
-    dockMesh.position.set(0, 0.05, 0);
-    dockMesh.receiveShadow = true;
-    this.scene.add(dockMesh);
+    const plate = new THREE.Mesh(plateGeo, plateMat);
+    plate.castShadow = true;
+    group.add(plate);
 
-    // Dock neon outer ring
-    const ringGeo = new THREE.RingGeometry(1.7, 1.85, 32);
-    const ringMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4, side: THREE.DoubleSide });
-    const ringMesh = new THREE.Mesh(ringGeo, ringMat);
-    ringMesh.rotation.x = -Math.PI / 2;
-    ringMesh.position.set(0, 0.11, 0);
-    this.scene.add(ringMesh);
+    // High-resolution crisp white text canvas
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#0f172a';
+    ctx.fillRect(0, 0, 512, 128);
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 50px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, 256, 64);
 
-    // Add path points group
-    this.scene.add(this.pathPointsGroup);
+    const texture = new THREE.CanvasTexture(canvas);
+    const labelGeo = new THREE.PlaneGeometry(width * 0.96, height * 0.88);
+    const labelMat = new THREE.MeshBasicMaterial({ map: texture });
+    const labelMesh = new THREE.Mesh(labelGeo, labelMat);
+    labelMesh.position.z = 0.045;
+    group.add(labelMesh);
+
+    return group;
   }
 
   setupBuildings() {
@@ -232,63 +379,213 @@ export class ThreeEngine {
 
       const colorHex = new THREE.Color(dest.color);
 
-      // Procedural Building Architecture
-      // Base platform
-      const baseGeo = new THREE.BoxGeometry(2.6, 0.3, 2.6);
-      const baseMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4, metalness: 0.6 });
-      const base = new THREE.Mesh(baseGeo, baseMat);
-      base.position.y = 0.15;
-      base.castShadow = true;
-      base.receiveShadow = true;
-      group.add(base);
+      if (dest.id === 'library') {
+        // --- 1. Library (2-Story Grand Building with Entrance Steps & Glass Facade) ---
+        // Main limestone building hull
+        const libGeo = new THREE.BoxGeometry(8.4, 4.2, 4.8);
+        const libMat = new THREE.MeshStandardMaterial({ color: 0xf1ede4, roughness: 0.5 });
+        const libMesh = new THREE.Mesh(libGeo, libMat);
+        libMesh.position.y = 2.1;
+        libMesh.castShadow = true;
+        libMesh.receiveShadow = true;
+        group.add(libMesh);
 
-      // Main tower structure
-      const towerHeight = dest.id === 'library' ? 3.8 : dest.id === 'classroom' ? 3.2 : dest.id === 'cafeteria' ? 2.4 : 3.0;
-      const towerGeo = new THREE.BoxGeometry(2.0, towerHeight, 2.0);
-      const towerMat = new THREE.MeshStandardMaterial({
-        color: 0x0f172a,
-        roughness: 0.3,
-        metalness: 0.7
-      });
-      const tower = new THREE.Mesh(towerGeo, towerMat);
-      tower.position.y = 0.3 + towerHeight / 2;
-      tower.castShadow = true;
-      tower.receiveShadow = true;
-      group.add(tower);
+        // Roof trim fascia
+        const roofTrimGeo = new THREE.BoxGeometry(8.6, 0.28, 5.0);
+        const roofTrimMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 });
+        const roofTrim = new THREE.Mesh(roofTrimGeo, roofTrimMat);
+        roofTrim.position.y = 4.2 + 0.14;
+        group.add(roofTrim);
 
-      // Glowing architectural accents in building color
-      const accentGeo = new THREE.BoxGeometry(2.04, 0.12, 2.04);
-      const accentMat = new THREE.MeshBasicMaterial({ color: colorHex });
-      for (let y = 1.0; y < towerHeight; y += 0.9) {
-        const band = new THREE.Mesh(accentGeo, accentMat);
-        band.position.y = 0.3 + y;
-        group.add(band);
+        // Recessed front glass entrance atrium
+        const glassGeo = new THREE.BoxGeometry(3.6, 2.8, 0.1);
+        const glassMat = new THREE.MeshStandardMaterial({
+          color: 0x38bdf8,
+          roughness: 0.1,
+          metalness: 0.6,
+          transparent: true,
+          opacity: 0.8
+        });
+        const glass = new THREE.Mesh(glassGeo, glassMat);
+        glass.position.set(0, 1.4, 2.42);
+        group.add(glass);
+
+        // Front entrance wide steps
+        for (let i = 0; i < 3; i++) {
+          const stepGeo = new THREE.BoxGeometry(4.2 - i * 0.4, 0.14, 0.5);
+          const stepMat = new THREE.MeshStandardMaterial({ color: 0xd6ccc2, roughness: 0.7 });
+          const step = new THREE.Mesh(stepGeo, stepMat);
+          step.position.set(0, 0.07 + i * 0.14, 2.6 + i * 0.4);
+          step.receiveShadow = true;
+          group.add(step);
+        }
+
+        // Prominent Library Signboard
+        const sign = this.createSignboardMesh('Library', 2.8, 0.65);
+        sign.position.set(0, 3.4, 2.46);
+        group.add(sign);
+
+      } else if (dest.id === 'cafeteria') {
+        // --- 2. Cafeteria (Single-Story Pavilion with Glass Storefront & Patio) ---
+        const cafeGeo = new THREE.BoxGeometry(5.8, 2.8, 5.0);
+        const cafeMat = new THREE.MeshStandardMaterial({ color: 0xf3eee3, roughness: 0.6 });
+        const cafeMesh = new THREE.Mesh(cafeGeo, cafeMat);
+        cafeMesh.position.y = 1.4;
+        cafeMesh.castShadow = true;
+        cafeMesh.receiveShadow = true;
+        group.add(cafeMesh);
+
+        // Warm wood/bronze fascia band
+        const fasciaGeo = new THREE.BoxGeometry(6.0, 0.4, 5.2);
+        const fasciaMat = new THREE.MeshStandardMaterial({ color: 0xc28e5c, roughness: 0.4 });
+        const fascia = new THREE.Mesh(fasciaGeo, fasciaMat);
+        fascia.position.y = 2.8 + 0.2;
+        group.add(fascia);
+
+        // Front glass storefront
+        const cafeGlassGeo = new THREE.BoxGeometry(4.2, 1.8, 0.1);
+        const cafeGlassMat = new THREE.MeshStandardMaterial({
+          color: 0x93c5fd,
+          roughness: 0.1,
+          metalness: 0.5,
+          transparent: true,
+          opacity: 0.75
+        });
+        const cafeGlass = new THREE.Mesh(cafeGlassGeo, cafeGlassMat);
+        cafeGlass.position.set(0, 1.0, 2.52);
+        group.add(cafeGlass);
+
+        // Outdoor dining umbrella & patio tables
+        [-1.8, 1.8].forEach((x) => {
+          const tableGeo = new THREE.CylinderGeometry(0.5, 0.5, 0.05, 16);
+          const tableMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8 });
+          const table = new THREE.Mesh(tableGeo, tableMat);
+          table.position.set(x, 0.45, 3.8);
+          group.add(table);
+
+          const poleGeo = new THREE.CylinderGeometry(0.04, 0.04, 1.6, 8);
+          const pole = new THREE.Mesh(poleGeo, tableMat);
+          pole.position.set(x, 0.8, 3.8);
+          group.add(pole);
+
+          const umbrellaGeo = new THREE.ConeGeometry(0.95, 0.45, 8);
+          const umbrellaMat = new THREE.MeshStandardMaterial({ color: x < 0 ? 0xf59e0b : 0x06b6d4 });
+          const umbrella = new THREE.Mesh(umbrellaGeo, umbrellaMat);
+          umbrella.position.set(x, 1.6, 3.8);
+          umbrella.castShadow = true;
+          group.add(umbrella);
+        });
+
+        // Prominent Cafeteria Signboard
+        const sign = this.createSignboardMesh('Cafeteria', 2.8, 0.65);
+        sign.position.set(0, 2.4, 2.56);
+        group.add(sign);
+
+      } else if (dest.id === 'computer_lab' || dest.id === 'classroom') {
+        // --- 3. Computer Lab (Hi-Tech Modern Academic Facility) ---
+        const labGeo = new THREE.BoxGeometry(5.6, 3.4, 4.8);
+        const labMat = new THREE.MeshStandardMaterial({ color: 0xeae5dc, roughness: 0.5 });
+        const labMesh = new THREE.Mesh(labGeo, labMat);
+        labMesh.position.y = 1.7;
+        labMesh.castShadow = true;
+        labMesh.receiveShadow = true;
+        group.add(labMesh);
+
+        // Dark roof trim
+        const roofTrimGeo = new THREE.BoxGeometry(5.8, 0.25, 5.0);
+        const roofTrimMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 });
+        const roofTrim = new THREE.Mesh(roofTrimGeo, roofTrimMat);
+        roofTrim.position.y = 3.4 + 0.125;
+        group.add(roofTrim);
+
+        // Ribbon window bands
+        for (let y = 1.0; y < 3.2; y += 1.1) {
+          const ribbonGeo = new THREE.BoxGeometry(4.6, 0.6, 0.1);
+          const ribbonMat = new THREE.MeshStandardMaterial({
+            color: 0x1e293b,
+            roughness: 0.2,
+            metalness: 0.7
+          });
+          const ribbon = new THREE.Mesh(ribbonGeo, ribbonMat);
+          ribbon.position.set(0, y, 2.42);
+          group.add(ribbon);
+        }
+
+        // Prominent Computer Lab Signboard
+        const sign = this.createSignboardMesh('Computer Lab', 3.0, 0.65);
+        sign.position.set(0, 2.9, 2.46);
+        group.add(sign);
+
+      } else if (dest.id === 'auditorium') {
+        // --- 4. Auditorium (Grand Architecture with Canopy Entrance) ---
+        const audiGeo = new THREE.BoxGeometry(6.4, 3.8, 5.4);
+        const audiMat = new THREE.MeshStandardMaterial({ color: 0xf5f0e8, roughness: 0.5 });
+        const audiMesh = new THREE.Mesh(audiGeo, audiMat);
+        audiMesh.position.y = 1.9;
+        audiMesh.castShadow = true;
+        audiMesh.receiveShadow = true;
+        group.add(audiMesh);
+
+        // Sloped entrance roof canopy
+        const canopyGeo = new THREE.BoxGeometry(4.4, 0.2, 1.8);
+        const canopyMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3 });
+        const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+        canopy.position.set(0, 2.2, 3.4);
+        canopy.rotation.x = -0.12;
+        canopy.castShadow = true;
+        group.add(canopy);
+
+        // Prominent Auditorium Signboard
+        const sign = this.createSignboardMesh('Auditorium', 3.0, 0.65);
+        sign.position.set(0, 2.8, 2.76);
+        group.add(sign);
+
+      } else if (dest.id === 'main_gate') {
+        // --- 5. Main Gate (Classical Stone Gateway Arch with Signboard) ---
+        const pillarMat = new THREE.MeshStandardMaterial({ color: 0xe2dad0, roughness: 0.6 });
+
+        // Left pillar
+        const leftPillarGeo = new THREE.BoxGeometry(0.8, 2.8, 0.8);
+        const leftPillar = new THREE.Mesh(leftPillarGeo, pillarMat);
+        leftPillar.position.set(-1.8, 1.4, 0);
+        leftPillar.castShadow = true;
+        group.add(leftPillar);
+
+        // Right pillar
+        const rightPillarGeo = new THREE.BoxGeometry(0.8, 2.8, 0.8);
+        const rightPillar = new THREE.Mesh(rightPillarGeo, pillarMat);
+        rightPillar.position.set(1.8, 1.4, 0);
+        rightPillar.castShadow = true;
+        group.add(rightPillar);
+
+        // Top archway lintel beam
+        const lintelGeo = new THREE.BoxGeometry(4.8, 0.6, 0.9);
+        const lintel = new THREE.Mesh(lintelGeo, pillarMat);
+        lintel.position.set(0, 2.8 + 0.3, 0);
+        lintel.castShadow = true;
+        group.add(lintel);
+
+        // Decorative black wrought-iron side fences
+        const fenceMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, metalness: 0.8 });
+        [-3.2, 3.2].forEach((fx) => {
+          const fenceGeo = new THREE.BoxGeometry(1.8, 1.4, 0.08);
+          const fence = new THREE.Mesh(fenceGeo, fenceMat);
+          fence.position.set(fx, 0.7, 0);
+          group.add(fence);
+        });
+
+        // Prominent Main Gate Signboard
+        const sign = this.createSignboardMesh('Main Gate', 2.8, 0.65);
+        sign.position.set(0, 3.1, 0.48);
+        group.add(sign);
       }
 
-      // Glass crown / roof beacon
-      const crownGeo = new THREE.BoxGeometry(1.2, 0.5, 1.2);
-      const crownMat = new THREE.MeshStandardMaterial({
-        color: colorHex,
-        emissive: colorHex,
-        emissiveIntensity: 0.6,
-        transparent: true,
-        opacity: 0.85
-      });
-      const crown = new THREE.Mesh(crownGeo, crownMat);
-      crown.position.y = 0.3 + towerHeight + 0.25;
-      group.add(crown);
-
-      // Building localized point light
-      const pointLight = new THREE.PointLight(colorHex, 1.8, 8);
-      pointLight.position.set(0, towerHeight + 0.5, 0);
-      group.add(pointLight);
-
-      // Holographic Destination Pillar / Beacon (Visible when selected)
-      const beaconGeo = new THREE.CylinderGeometry(0.08, 0.8, 14, 16, 1, true);
+      // Floating Holographic Beacon Pillar (toggled when destination selected)
+      const beaconGeo = new THREE.CylinderGeometry(0.08, 0.7, 14, 16, 1, true);
       const beaconMat = new THREE.MeshBasicMaterial({
         color: colorHex,
         transparent: true,
-        opacity: 0.0, // toggled when destination is selected
+        opacity: 0.0,
         side: THREE.DoubleSide,
         depthWrite: false
       });
@@ -297,67 +594,211 @@ export class ThreeEngine {
       group.add(beaconMesh);
       this.beaconMeshes.set(dest.id, beaconMesh);
 
-      // Pulsing destination target ring at building base
-      const targetRingGeo = new THREE.RingGeometry(1.7, 1.9, 32);
-      const targetRingMat = new THREE.MeshBasicMaterial({
+      // Target ring on ground
+      const ringGeo = new THREE.RingGeometry(1.6, 1.85, 32);
+      const ringMat = new THREE.MeshBasicMaterial({
         color: colorHex,
         transparent: true,
         opacity: 0.0,
         side: THREE.DoubleSide
       });
-      const targetRing = new THREE.Mesh(targetRingGeo, targetRingMat);
+      const targetRing = new THREE.Mesh(ringGeo, ringMat);
       targetRing.rotation.x = -Math.PI / 2;
       targetRing.position.y = 0.04;
       group.add(targetRing);
       beaconMesh.userData.targetRing = targetRing;
 
-      // Floating Canvas 2D Text Badge Sprite
-      const sprite = this.createBuildingLabelSprite(dest.name, dest.color);
-      sprite.position.set(0, towerHeight + 1.6, 0);
-      group.add(sprite);
-
       this.scene.add(group);
       this.buildingMeshes.set(dest.id, group);
     });
+
+    // Create 3D Destination Pin (Hovering Green Map Pin matching picture)
+    this.destinationPin = this.createDestinationPin();
+    this.destinationPin.visible = false;
+    this.scene.add(this.destinationPin);
   }
 
-  createBuildingLabelSprite(name, colorStr) {
-    const canvas = document.createElement('canvas');
-    canvas.width = 256;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
+  createDestinationPin() {
+    const pinGroup = new THREE.Group();
+    pinGroup.name = 'destination_pin';
 
-    // Rounded background pill
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-    ctx.strokeStyle = colorStr;
-    ctx.lineWidth = 4;
-    ctx.beginPath();
-    ctx.roundRect(8, 8, 240, 48, 12);
-    ctx.fill();
-    ctx.stroke();
+    const pinMat = new THREE.MeshStandardMaterial({
+      color: 0x10b981,
+      emissive: 0x10b981,
+      emissiveIntensity: 0.5,
+      roughness: 0.2,
+      metalness: 0.3
+    });
 
-    // Text label
-    ctx.fillStyle = '#FFFFFF';
-    ctx.font = 'bold 22px system-ui, -apple-system, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(name, 128, 32);
+    // Green sphere head
+    const headGeo = new THREE.SphereGeometry(0.35, 16, 16);
+    const head = new THREE.Mesh(headGeo, pinMat);
+    head.position.y = 0.9;
+    pinGroup.add(head);
 
-    const texture = new THREE.CanvasTexture(canvas);
-    const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
-    const sprite = new THREE.Sprite(spriteMat);
-    sprite.scale.set(3.2, 0.8, 1);
-    return sprite;
+    // Green downward cone point
+    const coneGeo = new THREE.ConeGeometry(0.34, 0.75, 16);
+    const cone = new THREE.Mesh(coneGeo, pinMat);
+    cone.position.y = 0.42;
+    cone.rotation.x = Math.PI;
+    pinGroup.add(cone);
+
+    // White center emblem dot
+    const dotGeo = new THREE.SphereGeometry(0.12, 12, 12);
+    const dotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const dot = new THREE.Mesh(dotGeo, dotMat);
+    dot.position.set(0, 0.9, 0.32);
+    pinGroup.add(dot);
+
+    // Glowing green concentric ground rings
+    const ringGeo = new THREE.RingGeometry(0.7, 0.9, 24);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x10b981,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.85
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.05;
+    pinGroup.add(ring);
+
+    return pinGroup;
   }
 
-  createRoverWheel(isLeftSide) {
+  setupSceneryProps() {
+    // 1. Lush Deciduous Trees (wooden trunk + spherical leafy green canopies)
+    const treePositions = [
+      { x: -3.8, z: 2.5 },
+      { x: 3.8, z: 2.2 },
+      { x: -3.5, z: -5.5 },
+      { x: 3.5, z: -5.5 },
+      { x: -7.5, z: 3.5 },
+      { x: -5.5, z: 6.5 },
+      { x: 6.5, z: 3.2 },
+      { x: 5.2, z: 5.5 },
+      { x: -3.2, z: -9.5 },
+      { x: 3.2, z: -9.5 }
+    ];
+
+    const trunkMat = new THREE.MeshStandardMaterial({ color: 0x5c3d2e, roughness: 0.85 });
+    const foliageMatA = new THREE.MeshStandardMaterial({ color: 0x2d6a4f, roughness: 0.8 });
+    const foliageMatB = new THREE.MeshStandardMaterial({ color: 0x40916c, roughness: 0.8 });
+    const foliageMatC = new THREE.MeshStandardMaterial({ color: 0x52b788, roughness: 0.8 });
+
+    treePositions.forEach((pos, idx) => {
+      const tree = new THREE.Group();
+      tree.position.set(pos.x, 0, pos.z);
+
+      // Trunk
+      const trunkGeo = new THREE.CylinderGeometry(0.18, 0.28, 1.8, 8);
+      const trunk = new THREE.Mesh(trunkGeo, trunkMat);
+      trunk.position.y = 0.9;
+      trunk.castShadow = true;
+      tree.add(trunk);
+
+      // Multi-sphere lush foliage clusters
+      const mat = idx % 3 === 0 ? foliageMatA : idx % 3 === 1 ? foliageMatB : foliageMatC;
+      const sphereA = new THREE.Mesh(new THREE.SphereGeometry(0.9, 12, 12), mat);
+      sphereA.position.y = 2.1;
+      sphereA.castShadow = true;
+      tree.add(sphereA);
+
+      const sphereB = new THREE.Mesh(new THREE.SphereGeometry(0.65, 10, 10), mat);
+      sphereB.position.set(0.35, 2.5, 0.2);
+      sphereB.castShadow = true;
+      tree.add(sphereB);
+
+      const sphereC = new THREE.Mesh(new THREE.SphereGeometry(0.6, 10, 10), mat);
+      sphereC.position.set(-0.3, 2.4, -0.25);
+      sphereC.castShadow = true;
+      tree.add(sphereC);
+
+      this.scene.add(tree);
+    });
+
+    // 2. Wooden Park Benches with Dark Iron Frames
+    const benchPositions = [
+      { x: -2.8, z: -2.2, rot: Math.PI / 4 },
+      { x: 2.8, z: -2.2, rot: -Math.PI / 4 },
+      { x: -2.8, z: 0.2, rot: Math.PI / 2 },
+      { x: 2.8, z: 0.2, rot: -Math.PI / 2 }
+    ];
+
+    const benchWoodMat = new THREE.MeshStandardMaterial({ color: 0xb45309, roughness: 0.7 });
+    const benchMetalMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.4 });
+
+    benchPositions.forEach((b) => {
+      const bench = new THREE.Group();
+      bench.position.set(b.x, 0, b.z);
+      bench.rotation.y = b.rot;
+
+      // Seat slats
+      const seatGeo = new THREE.BoxGeometry(1.2, 0.06, 0.36);
+      const seat = new THREE.Mesh(seatGeo, benchWoodMat);
+      seat.position.y = 0.32;
+      seat.castShadow = true;
+      bench.add(seat);
+
+      // Backrest
+      const backGeo = new THREE.BoxGeometry(1.2, 0.28, 0.05);
+      const back = new THREE.Mesh(backGeo, benchWoodMat);
+      back.position.set(0, 0.52, -0.16);
+      back.castShadow = true;
+      bench.add(back);
+
+      // Metal legs
+      [-0.5, 0.5].forEach((lx) => {
+        const legGeo = new THREE.BoxGeometry(0.06, 0.32, 0.36);
+        const leg = new THREE.Mesh(legGeo, benchMetalMat);
+        leg.position.set(lx, 0.16, 0);
+        bench.add(leg);
+      });
+
+      this.scene.add(bench);
+    });
+
+    // 3. Classic Campus Street Lamp Posts
+    const lampPositions = [
+      { x: -1.6, z: 3.2 },
+      { x: 1.6, z: 3.2 },
+      { x: -1.6, z: -4.8 },
+      { x: 1.6, z: -4.8 },
+      { x: -4.8, z: -1.0 },
+      { x: 4.8, z: -1.0 }
+    ];
+
+    const lampPostMat = new THREE.MeshStandardMaterial({ color: 0x111827, roughness: 0.3, metalness: 0.8 });
+    const lanternMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+
+    lampPositions.forEach((pos) => {
+      const lamp = new THREE.Group();
+      lamp.position.set(pos.x, 0, pos.z);
+
+      // Post
+      const postGeo = new THREE.CylinderGeometry(0.06, 0.1, 2.2, 8);
+      const post = new THREE.Mesh(postGeo, lampPostMat);
+      post.position.y = 1.1;
+      post.castShadow = true;
+      lamp.add(post);
+
+      // Lantern housing
+      const lanternGeo = new THREE.BoxGeometry(0.24, 0.3, 0.24);
+      const lantern = new THREE.Mesh(lanternGeo, lanternMat);
+      lantern.position.y = 2.25;
+      lamp.add(lantern);
+
+      this.scene.add(lamp);
+    });
+  }
+
+  // Heavy-duty wheel with cyan rim ring
+  createHeavyDutyWheel(isLeftSide = true) {
     const wheelGroup = new THREE.Group();
-
-    // Tire dimensions: radius 0.22, width 0.14
     const tireRadius = 0.22;
     const tireWidth = 0.14;
 
-    // Heavy-duty rugged tire rubber (matches black off-road rover tires)
+    // Rugged rubber tire
     const tireGeo = new THREE.CylinderGeometry(tireRadius, tireRadius, tireWidth, 24);
     const tireMat = new THREE.MeshStandardMaterial({
       color: 0x111827,
@@ -370,371 +811,247 @@ export class ThreeEngine {
     tire.receiveShadow = true;
     wheelGroup.add(tire);
 
-    // Chunky off-road tire treads (12 lugs around perimeter for rugged look)
-    const treadCount = 12;
+    // Chunky treads
     const treadMat = new THREE.MeshStandardMaterial({ color: 0x070b14, roughness: 0.95 });
-    for (let i = 0; i < treadCount; i++) {
-      const angle = (i / treadCount) * Math.PI * 2;
+    for (let i = 0; i < 12; i++) {
+      const angle = (i / 12) * Math.PI * 2;
       const treadGeo = new THREE.BoxGeometry(tireWidth * 0.96, 0.022, 0.04);
       const tread = new THREE.Mesh(treadGeo, treadMat);
-      tread.position.set(
-        0,
-        Math.sin(angle) * (tireRadius + 0.005),
-        Math.cos(angle) * (tireRadius + 0.005)
-      );
+      tread.position.set(0, Math.sin(angle) * (tireRadius + 0.005), Math.cos(angle) * (tireRadius + 0.005));
       tread.rotation.x = -angle;
       wheelGroup.add(tread);
     }
 
-    // Inset dark metallic rim drum
+    // Metallic rim drum
     const rimGeo = new THREE.CylinderGeometry(tireRadius * 0.74, tireRadius * 0.74, tireWidth * 1.02, 24);
-    const rimMat = new THREE.MeshStandardMaterial({
-      color: 0x1e293b,
-      roughness: 0.35,
-      metalness: 0.8
-    });
+    const rimMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.35, metalness: 0.8 });
     const rim = new THREE.Mesh(rimGeo, rimMat);
     rim.rotation.z = Math.PI / 2;
     wheelGroup.add(rim);
 
-    // Signature Electric Cyan / Blue Glowing Outer Rim Ring (Matches picture!)
+    // Glowing cyan neon rim ring (Signature feature from picture!)
     const ringGeo = new THREE.RingGeometry(tireRadius * 0.48, tireRadius * 0.66, 32);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: 0x00f2fe,
-      side: THREE.DoubleSide
-    });
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe, side: THREE.DoubleSide });
     const ring = new THREE.Mesh(ringGeo, ringMat);
     ring.rotation.y = Math.PI / 2;
-    // Position on outward face of wheel
     const outerFaceX = isLeftSide ? -tireWidth / 2 - 0.006 : tireWidth / 2 + 0.006;
     ring.position.x = outerFaceX;
     wheelGroup.add(ring);
-
-    // Center Metallic Axle Hub Nut
-    const hubGeo = new THREE.CylinderGeometry(0.045, 0.045, tireWidth * 1.1, 16);
-    const hubMat = new THREE.MeshStandardMaterial({
-      color: 0x94a3b8,
-      metalness: 0.9,
-      roughness: 0.2
-    });
-    const hub = new THREE.Mesh(hubGeo, hubMat);
-    hub.rotation.z = Math.PI / 2;
-    wheelGroup.add(hub);
 
     return wheelGroup;
   }
 
   setupRobot() {
     this.robotGroup = new THREE.Group();
-    this.robotGroup.position.set(0, 0, 0);
+    this.robotGroup.position.set(-5, 0, 5.5);
+    this.robotGroup.rotation.y = this.robotTargetHeading;
     this.robotWheels = [];
 
-    // 1. Lower Chassis Skid Plate / Undercarriage (dark slate)
+    // 1. Undercarriage Skid Plate
     const skidGeo = new THREE.BoxGeometry(0.66, 0.10, 0.96);
-    const skidMat = new THREE.MeshStandardMaterial({
-      color: 0x0f172a,
-      roughness: 0.7,
-      metalness: 0.6
-    });
+    const skidMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.7, metalness: 0.6 });
     const skid = new THREE.Mesh(skidGeo, skidMat);
     skid.position.y = 0.16;
     skid.castShadow = true;
-    skid.receiveShadow = true;
     this.robotGroup.add(skid);
 
-    // 2. White Satin Body Hull (Matches the white delivery rover in the picture)
+    // 2. White Satin Body Hull
     const bodyGeo = new THREE.BoxGeometry(0.74, 0.24, 0.98);
-    const bodyMat = new THREE.MeshStandardMaterial({
-      color: 0xf8fafc,
-      roughness: 0.25,
-      metalness: 0.15
-    });
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0xf8fafc, roughness: 0.25, metalness: 0.15 });
     const body = new THREE.Mesh(bodyGeo, bodyMat);
-    body.position.y = 0.31;
+    body.position.y = 0.32;
     body.castShadow = true;
     body.receiveShadow = true;
     this.robotGroup.add(body);
 
-    // Rounded vertical corners for sleek automotive rover styling
-    const cornerRadius = 0.08;
-    const cornerHeight = 0.24;
-    const cornerGeo = new THREE.CylinderGeometry(cornerRadius, cornerRadius, cornerHeight, 16);
-    const cornerPositions = [
-      [-0.30, 0.31, -0.42],
-      [0.30, 0.31, -0.42],
-      [-0.30, 0.31, 0.42],
-      [0.30, 0.31, 0.42]
-    ];
-    cornerPositions.forEach(([x, y, z]) => {
-      const corner = new THREE.Mesh(cornerGeo, bodyMat);
-      corner.position.set(x, y, z);
-      corner.castShadow = true;
-      this.robotGroup.add(corner);
-    });
-
-    // Front Bumper / Nose Slope Panel
-    const noseGeo = new THREE.BoxGeometry(0.62, 0.12, 0.10);
+    // Sloped aerodynamic front nose
+    const noseGeo = new THREE.BoxGeometry(0.72, 0.18, 0.22);
     const nose = new THREE.Mesh(noseGeo, bodyMat);
-    nose.position.set(0, 0.25, -0.50);
-    nose.rotation.x = Math.PI / 12;
+    nose.position.set(0, 0.27, 0.52);
+    nose.rotation.x = 0.18;
     this.robotGroup.add(nose);
 
-    // Front Lower Sensor / Air Intake Slit (dark contrast)
-    const intakeGeo = new THREE.BoxGeometry(0.48, 0.04, 0.03);
-    const intakeMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.8 });
-    const intake = new THREE.Mesh(intakeGeo, intakeMat);
-    intake.position.set(0, 0.20, -0.51);
-    this.robotGroup.add(intake);
-
-    // 3. Signature Cyan LED Cyber Light Bar (Horizontal wrap-around headlight)
-    const lightBarMat = new THREE.MeshStandardMaterial({
-      color: 0x38bdf8,
-      emissive: 0x00f2fe,
-      emissiveIntensity: 2.8,
-      roughness: 0.1,
-      metalness: 0.5
-    });
-
-    // Front horizontal light strip
-    const frontLightGeo = new THREE.BoxGeometry(0.70, 0.045, 0.04);
-    const frontLight = new THREE.Mesh(frontLightGeo, lightBarMat);
-    frontLight.position.set(0, 0.41, -0.50);
-    this.robotGroup.add(frontLight);
-
-    // Wrap-around side light strips (left & right front quarter panels)
-    const sideLightGeo = new THREE.BoxGeometry(0.04, 0.045, 0.32);
-    const leftSideLight = new THREE.Mesh(sideLightGeo, lightBarMat);
-    leftSideLight.position.set(-0.375, 0.41, -0.34);
-    this.robotGroup.add(leftSideLight);
-
-    const rightSideLight = new THREE.Mesh(sideLightGeo, lightBarMat);
-    rightSideLight.position.set(0.375, 0.41, -0.34);
-    this.robotGroup.add(rightSideLight);
-
-    // Directional forward cyan pavement illumination
-    const frontGlow = new THREE.PointLight(0x00f2fe, 2.5, 4.5, 1.2);
-    frontGlow.position.set(0, 0.38, -0.65);
-    this.robotGroup.add(frontGlow);
-
-    // Forward beam spotlight casting light ahead along path
-    const headlight = new THREE.SpotLight(0x67e8f9, 3.5, 8, Math.PI / 4, 0.4, 1.2);
-    headlight.position.set(0, 0.40, -0.55);
-    const headlightTarget = new THREE.Object3D();
-    headlightTarget.position.set(0, 0, -5);
-    this.robotGroup.add(headlightTarget);
-    headlight.target = headlightTarget;
-    this.robotGroup.add(headlight);
-
-    // 4. Black Top Deck / Hood / Sunroof
-    const deckGeo = new THREE.BoxGeometry(0.68, 0.03, 0.90);
-    const deckMat = new THREE.MeshStandardMaterial({
-      color: 0x090d16,
-      roughness: 0.3,
-      metalness: 0.85
-    });
-    const deck = new THREE.Mesh(deckGeo, deckMat);
-    deck.position.y = 0.44;
-    deck.castShadow = true;
-    this.robotGroup.add(deck);
-
-    // 5. Center Sensor Turret & LiDAR Dome (Matches multi-camera & LiDAR head)
-    const turretGroup = new THREE.Group();
-    turretGroup.position.set(0, 0.455, -0.02);
-
-    // Base Mounting Collar
-    const baseCollarGeo = new THREE.CylinderGeometry(0.22, 0.24, 0.05, 32);
-    const baseCollarMat = new THREE.MeshStandardMaterial({
-      color: 0x1e293b,
-      metalness: 0.8,
-      roughness: 0.3
-    });
-    const baseCollar = new THREE.Mesh(baseCollarGeo, baseCollarMat);
-    baseCollar.position.y = 0.025;
-    baseCollar.castShadow = true;
-    turretGroup.add(baseCollar);
-
-    // Camera Sensor Housing Block (Middle tier)
-    const camHousingGeo = new THREE.CylinderGeometry(0.18, 0.20, 0.09, 32);
-    const camHousingMat = new THREE.MeshStandardMaterial({
-      color: 0x0b1120,
-      metalness: 0.9,
-      roughness: 0.15
-    });
-    const camHousing = new THREE.Mesh(camHousingGeo, camHousingMat);
-    camHousing.position.y = 0.09;
-    camHousing.castShadow = true;
-    turretGroup.add(camHousing);
-
-    // Front AI Vision Camera Lens Aperture (As seen in the picture!)
-    const lensApertureGeo = new THREE.CylinderGeometry(0.032, 0.032, 0.015, 16);
-    const lensApertureMat = new THREE.MeshStandardMaterial({
-      color: 0x0284c7,
-      emissive: 0x0284c7,
-      emissiveIntensity: 0.6,
-      metalness: 0.95,
-      roughness: 0.05
-    });
-    const frontLens = new THREE.Mesh(lensApertureGeo, lensApertureMat);
-    frontLens.rotation.x = Math.PI / 2;
-    frontLens.position.set(0, 0.09, -0.19);
-    turretGroup.add(frontLens);
-
-    // Side & rear camera sensor dots
-    [
-      [-0.19, 0.09, 0, Math.PI / 2],
-      [0.19, 0.09, 0, -Math.PI / 2],
-      [0, 0.09, 0.19, Math.PI]
-    ].forEach(([x, y, z, rotY]) => {
-      const sensorDot = new THREE.Mesh(lensApertureGeo, lensApertureMat);
-      sensorDot.rotation.x = Math.PI / 2;
-      sensorDot.rotation.z = rotY;
-      sensorDot.position.set(x, y, z);
-      turretGroup.add(sensorDot);
-    });
-
-    // Rotating 360° LiDAR Puck (Top tier)
-    const lidarGroup = new THREE.Group();
-    lidarGroup.position.set(0, 0.18, 0);
-
-    const lidarPuckGeo = new THREE.CylinderGeometry(0.15, 0.15, 0.09, 32);
-    const lidarPuckMat = new THREE.MeshStandardMaterial({
-      color: 0x0f172a,
-      metalness: 0.85,
-      roughness: 0.2
-    });
-    const puckBody = new THREE.Mesh(lidarPuckGeo, lidarPuckMat);
-    lidarGroup.add(puckBody);
-
-    // Reflective optical sensor slit band around LiDAR
-    const slitGeo = new THREE.CylinderGeometry(0.153, 0.153, 0.028, 32);
-    const slitMat = new THREE.MeshStandardMaterial({
-      color: 0x0369a1,
-      emissive: 0x0284c7,
-      emissiveIntensity: 0.8,
-      roughness: 0.1
-    });
-    const slit = new THREE.Mesh(slitGeo, slitMat);
-    lidarGroup.add(slit);
-
-    // Glowing laser scanner indicator eye
-    const eyeGeo = new THREE.BoxGeometry(0.04, 0.02, 0.06);
+    // 3. Front LED Headlight Eyes
+    const eyeGeo = new THREE.PlaneGeometry(0.12, 0.08);
     const eyeMat = new THREE.MeshBasicMaterial({ color: 0x38bdf8 });
-    const eye = new THREE.Mesh(eyeGeo, eyeMat);
-    eye.position.set(0.12, 0, 0);
-    lidarGroup.add(eye);
-
-    // Turret Crown Cap & Center Antenna Node
-    const crownGeo = new THREE.CylinderGeometry(0.09, 0.11, 0.03, 32);
-    const crownMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, metalness: 0.8 });
-    const crown = new THREE.Mesh(crownGeo, crownMat);
-    crown.position.y = 0.06;
-    lidarGroup.add(crown);
-
-    const antennaGeo = new THREE.CylinderGeometry(0.015, 0.02, 0.05, 16);
-    const antennaMat = new THREE.MeshStandardMaterial({ color: 0x020617, metalness: 0.9 });
-    const antenna = new THREE.Mesh(antennaGeo, antennaMat);
-    antenna.position.y = 0.095;
-    lidarGroup.add(antenna);
-
-    this.lidarPuck = lidarGroup;
-    turretGroup.add(this.lidarPuck);
-    this.robotGroup.add(turretGroup);
-
-    // 6. 4 Off-Road All-Terrain Rover Wheels (4WD)
-    // Left side wheels (isLeftSide = true)
-    const flWheel = this.createRoverWheel(true);
-    flWheel.position.set(-0.48, 0.22, -0.32);
-    this.robotGroup.add(flWheel);
-    this.robotWheels.push(flWheel);
-
-    const rlWheel = this.createRoverWheel(true);
-    rlWheel.position.set(-0.48, 0.22, 0.32);
-    this.robotGroup.add(rlWheel);
-    this.robotWheels.push(rlWheel);
-
-    // Right side wheels (isLeftSide = false)
-    const frWheel = this.createRoverWheel(false);
-    frWheel.position.set(0.48, 0.22, -0.32);
-    this.robotGroup.add(frWheel);
-    this.robotWheels.push(frWheel);
-
-    const rrWheel = this.createRoverWheel(false);
-    rrWheel.position.set(0.48, 0.22, 0.32);
-    this.robotGroup.add(rrWheel);
-    this.robotWheels.push(rrWheel);
-
-    // Wheel axle connecting rods into the chassis
-    const axleGeo = new THREE.CylinderGeometry(0.02, 0.02, 0.98, 16);
-    const axleMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.8 });
-    [-0.32, 0.32].forEach((z) => {
-      const axle = new THREE.Mesh(axleGeo, axleMat);
-      axle.rotation.z = Math.PI / 2;
-      axle.position.set(0, 0.22, z);
-      this.robotGroup.add(axle);
+    [-0.18, 0.18].forEach((ex) => {
+      const eye = new THREE.Mesh(eyeGeo, eyeMat);
+      eye.position.set(ex, 0.28, 0.62);
+      this.robotGroup.add(eye);
     });
 
-    // 7. Floating NaviBot Nameplate Badge
-    const canvas = document.createElement('canvas');
-    canvas.width = 160;
-    canvas.height = 42;
-    const ctx = canvas.getContext('2d');
-    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-    ctx.strokeStyle = '#06B6D4';
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.roundRect(4, 4, 152, 34, 10);
-    ctx.fill();
-    ctx.stroke();
+    // 4. Wrap-Around Neon Cyan Cyber Light Bar
+    const lightBarGeo = new THREE.BoxGeometry(0.76, 0.038, 0.06);
+    const lightBarMat = new THREE.MeshBasicMaterial({ color: 0x00f2fe });
+    const lightBar = new THREE.Mesh(lightBarGeo, lightBarMat);
+    lightBar.position.set(0, 0.21, 0.58);
+    this.robotGroup.add(lightBar);
 
-    ctx.fillStyle = '#38BDF8';
-    ctx.font = 'bold 15px system-ui, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText('NaviBot • AMR', 80, 21);
+    // 5. Sensor Turret with Continuously Spinning LiDAR Puck
+    const turretBaseGeo = new THREE.CylinderGeometry(0.24, 0.28, 0.16, 24);
+    const turretBaseMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4, metalness: 0.8 });
+    const turretBase = new THREE.Mesh(turretBaseGeo, turretBaseMat);
+    turretBase.position.y = 0.44 + 0.08;
+    turretBase.castShadow = true;
+    this.robotGroup.add(turretBase);
 
-    const tagTexture = new THREE.CanvasTexture(canvas);
-    const tagMat = new THREE.SpriteMaterial({ map: tagTexture, transparent: true });
-    const tagSprite = new THREE.Sprite(tagMat);
-    tagSprite.scale.set(1.5, 0.4, 1);
-    tagSprite.position.set(0, 1.05, 0);
-    this.robotGroup.add(tagSprite);
+    // Rotating LiDAR puck
+    const puckGeo = new THREE.CylinderGeometry(0.20, 0.20, 0.12, 24);
+    const puckMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3, metalness: 0.9 });
+    this.lidarPuck = new THREE.Mesh(puckGeo, puckMat);
+    this.lidarPuck.position.y = 0.52 + 0.10;
+    this.robotGroup.add(this.lidarPuck);
+
+    // Optical camera lens
+    const lensGeo = new THREE.CylinderGeometry(0.065, 0.065, 0.08, 16);
+    const lensMat = new THREE.MeshStandardMaterial({ color: 0x0284c7, metalness: 0.9, roughness: 0.1 });
+    const lens = new THREE.Mesh(lensGeo, lensMat);
+    lens.rotation.x = Math.PI / 2;
+    lens.position.set(0, 0.56, 0.21);
+    this.robotGroup.add(lens);
+
+    // 6. Forward POV Camera (Used for Camera View HUD card)
+    this.povCamera = new THREE.PerspectiveCamera(55, 16 / 9, 0.1, 80);
+    this.povCamera.position.set(0, 0.65, 0.25);
+    this.povCamera.rotation.set(-0.04, Math.PI, 0); // Looking forward
+    this.robotGroup.add(this.povCamera);
+
+    // 7. Mount 4 Heavy-Duty Wheels
+    const wheelPositions = [
+      { x: -0.42, y: 0.22, z: 0.34, isLeft: true },
+      { x: 0.42, y: 0.22, z: 0.34, isLeft: false },
+      { x: -0.42, y: 0.22, z: -0.34, isLeft: true },
+      { x: 0.42, y: 0.22, z: -0.34, isLeft: false }
+    ];
+
+    wheelPositions.forEach((wp) => {
+      const wheel = this.createHeavyDutyWheel(wp.isLeft);
+      wheel.position.set(wp.x, wp.y, wp.z);
+      this.robotGroup.add(wheel);
+      this.robotWheels.push(wheel);
+    });
 
     this.scene.add(this.robotGroup);
   }
 
   setupHoverPreview() {
-    // Semi-transparent ghost marker showing where an obstacle will spawn
     const group = new THREE.Group();
-
     const ringGeo = new THREE.RingGeometry(0.6, 0.75, 24);
-    const ringMat = new THREE.MeshBasicMaterial({
-      color: 0xf59e0b,
-      transparent: true,
-      opacity: 0.65,
-      side: THREE.DoubleSide
-    });
+    const ringMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.65, side: THREE.DoubleSide });
     const ring = new THREE.Mesh(ringGeo, ringMat);
     ring.rotation.x = -Math.PI / 2;
     ring.position.y = 0.05;
     group.add(ring);
-
-    const coneGeo = new THREE.ConeGeometry(0.35, 0.8, 16);
-    const coneMat = new THREE.MeshStandardMaterial({
-      color: 0xf59e0b,
-      transparent: true,
-      opacity: 0.45,
-      roughness: 0.3
-    });
-    const cone = new THREE.Mesh(coneGeo, coneMat);
-    cone.position.y = 0.45;
-    group.add(cone);
-
     group.visible = false;
     this.hoverPreviewMesh = group;
     this.scene.add(this.hoverPreviewMesh);
   }
 
-  // Sync Obstacles with simulationController state
+  createObstacleAlertBadge() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 384;
+    canvas.height = 96;
+    const ctx = canvas.getContext('2d');
+
+    // Red rounded pill background
+    ctx.fillStyle = 'rgba(220, 38, 38, 0.94)';
+    ctx.strokeStyle = '#ffffff';
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    ctx.roundRect(8, 8, 368, 80, 20);
+    ctx.fill();
+    ctx.stroke();
+
+    // Text & Warning Symbol
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 32px system-ui, -apple-system, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('⚠ Obstacle Detected', 192, 48);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const spriteMat = new THREE.SpriteMaterial({ map: texture, transparent: true });
+    const sprite = new THREE.Sprite(spriteMat);
+    sprite.scale.set(2.4, 0.6, 1);
+    sprite.name = 'alert_badge';
+    return sprite;
+  }
+
+  createObstacleMesh(obs) {
+    const group = new THREE.Group();
+    const worldX = obs.world ? obs.world.x : (obs.grid.x - 10);
+    const worldZ = obs.world ? obs.world.z : (obs.grid.y - 10);
+    group.position.set(worldX, 0, worldZ);
+    group.userData = { id: obs.id, isObstacle: true };
+
+    const redBarricadeMat = new THREE.MeshStandardMaterial({
+      color: 0xdc2626, // Safety Red
+      roughness: 0.35,
+      metalness: 0.1
+    });
+
+    // Dual Interlocking Red Plastic Highway Jersey Barriers (Matches Picture!)
+    [-0.52, 0.52].forEach((offsetX) => {
+      const barrierGroup = new THREE.Group();
+      barrierGroup.position.x = offsetX;
+
+      // Base Foot
+      const footGeo = new THREE.BoxGeometry(0.95, 0.18, 0.48);
+      const foot = new THREE.Mesh(footGeo, redBarricadeMat);
+      foot.position.y = 0.09;
+      foot.castShadow = true;
+      foot.receiveShadow = true;
+      barrierGroup.add(foot);
+
+      // Sloped Body
+      const bodyGeo = new THREE.BoxGeometry(0.92, 0.44, 0.30);
+      const body = new THREE.Mesh(bodyGeo, redBarricadeMat);
+      body.position.y = 0.18 + 0.22;
+      body.castShadow = true;
+      barrierGroup.add(body);
+
+      // Top Ribbed Handle
+      const topGeo = new THREE.BoxGeometry(0.90, 0.12, 0.18);
+      const top = new THREE.Mesh(topGeo, redBarricadeMat);
+      top.position.y = 0.62 + 0.06;
+      top.castShadow = true;
+      barrierGroup.add(top);
+
+      // White reflective safety bands
+      const stripeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      [-0.24, 0.24].forEach((sx) => {
+        const stripeGeo = new THREE.BoxGeometry(0.12, 0.32, 0.31);
+        const stripe = new THREE.Mesh(stripeGeo, stripeMat);
+        stripe.position.set(sx, 0.4, 0);
+        barrierGroup.add(stripe);
+      });
+
+      group.add(barrierGroup);
+    });
+
+    // 3D Floating "Obstacle Detected" triangular alert badge directly above barrier
+    const alertBadge = this.createObstacleAlertBadge();
+    alertBadge.position.set(0, 1.65, 0);
+    group.add(alertBadge);
+
+    // Red dashed line indicating blocked straight path on ground
+    const dashLineGeo = new THREE.BufferGeometry().setFromPoints([
+      new THREE.Vector3(-1.2, 0.05, 1.8),
+      new THREE.Vector3(0, 0.05, 0)
+    ]);
+    const dashLineMat = new THREE.LineDashedMaterial({
+      color: 0xef4444,
+      dashSize: 0.35,
+      gapSize: 0.2,
+      linewidth: 3
+    });
+    const dashLine = new THREE.Line(dashLineGeo, dashLineMat);
+    dashLine.computeLineDistances();
+    group.add(dashLine);
+
+    return group;
+  }
+
   syncObstacles(obstacles) {
     const currentIds = new Set(obstacles.map(o => o.id));
 
@@ -758,65 +1075,13 @@ export class ThreeEngine {
         this.obstacleMeshes.set(obs.id, obsMesh);
       } else {
         const existing = this.obstacleMeshes.get(obs.id);
-        const worldX = obs.grid.x - 10;
-        const worldZ = obs.grid.y - 10;
+        const worldX = obs.world ? obs.world.x : (obs.grid.x - 10);
+        const worldZ = obs.world ? obs.world.z : (obs.grid.y - 10);
         existing.position.set(worldX, 0, worldZ);
       }
     });
   }
 
-  createObstacleMesh(obs) {
-    const group = new THREE.Group();
-    const worldX = obs.grid.x - 10;
-    const worldZ = obs.grid.y - 10;
-    group.position.set(worldX, 0, worldZ);
-    group.userData = { id: obs.id, isObstacle: true };
-
-    // Hazard cone base
-    const baseGeo = new THREE.BoxGeometry(0.75, 0.08, 0.75);
-    const baseMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.5 });
-    const base = new THREE.Mesh(baseGeo, baseMat);
-    base.position.y = 0.04;
-    base.castShadow = true;
-    base.receiveShadow = true;
-    group.add(base);
-
-    // Hazard Traffic Pylon
-    const pylonGeo = new THREE.ConeGeometry(0.35, 1.0, 16);
-    const pylonMat = new THREE.MeshStandardMaterial({
-      color: 0xf59e0b,
-      roughness: 0.25,
-      metalness: 0.3
-    });
-    const pylon = new THREE.Mesh(pylonGeo, pylonMat);
-    pylon.position.y = 0.54;
-    pylon.castShadow = true;
-    group.add(pylon);
-
-    // Reflective white warning rings on cone
-    const bandGeo = new THREE.CylinderGeometry(0.22, 0.26, 0.18, 16);
-    const bandMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.2 });
-    const band = new THREE.Mesh(bandGeo, bandMat);
-    band.position.y = 0.48;
-    group.add(band);
-
-    // Warning beacon point light
-    const warnLight = new THREE.PointLight(0xf59e0b, 1.5, 4);
-    warnLight.position.set(0, 1.1, 0);
-    group.add(warnLight);
-
-    // Floating animated diamond warning marker
-    const diamondGeo = new THREE.OctahedronGeometry(0.18);
-    const diamondMat = new THREE.MeshBasicMaterial({ color: 0xfef08a, wireframe: true });
-    const diamond = new THREE.Mesh(diamondGeo, diamondMat);
-    diamond.position.y = 1.35;
-    diamond.name = 'floating_diamond';
-    group.add(diamond);
-
-    return group;
-  }
-
-  // Sync Active Route Ribbon with A* waypoints
   syncRoute(route, status) {
     this.activeRoute = route || [];
     this.status = status;
@@ -829,188 +1094,98 @@ export class ThreeEngine {
       this.pathLineMesh = null;
     }
 
-    // Clear waypoints markers
-    while (this.pathPointsGroup.children.length > 0) {
-      const child = this.pathPointsGroup.children[0];
-      this.pathPointsGroup.remove(child);
+    // Clear chevron arrows
+    while (this.pathChevronsGroup.children.length > 0) {
+      const child = this.pathChevronsGroup.children[0];
+      this.pathChevronsGroup.remove(child);
       if (child.geometry) child.geometry.dispose();
       if (child.material) child.material.dispose();
     }
 
     if (!route || route.length < 2) return;
 
-    // Create 3D points
+    // 3D waypoints
     const points = route.map(wp => {
       const gx = wp.grid ? wp.grid.x : (wp.x || 10);
       const gy = wp.grid ? wp.grid.y : (wp.y || 10);
       return new THREE.Vector3(gx - 10, 0.12, gy - 10);
     });
 
-    const isRecalculating = status === 'avoiding_obstacle';
-    const pathColor = isRecalculating ? 0xf59e0b : 0x10b981;
-
-    // Smooth spline curve through waypoints
+    // Spline curve
     const curve = new THREE.CatmullRomCurve3(points);
-    const tubeGeo = new THREE.TubeGeometry(curve, Math.max(12, points.length * 6), 0.08, 8, false);
+    const tubeGeo = new THREE.TubeGeometry(curve, Math.max(16, points.length * 8), 0.14, 12, false);
     const tubeMat = new THREE.MeshStandardMaterial({
-      color: pathColor,
-      emissive: pathColor,
-      emissiveIntensity: 0.7,
-      roughness: 0.2,
-      metalness: 0.8
+      color: 0x00f2fe,
+      emissive: 0x00f2fe,
+      emissiveIntensity: 0.85,
+      roughness: 0.15,
+      metalness: 0.3
     });
 
     this.pathLineMesh = new THREE.Mesh(tubeGeo, tubeMat);
     this.scene.add(this.pathLineMesh);
 
-    // Add glowing node dots along waypoints
-    const dotGeo = new THREE.SphereGeometry(0.1, 12, 12);
-    const dotMat = new THREE.MeshBasicMaterial({ color: pathColor });
-    points.forEach((pt, i) => {
-      if (i % 2 === 0 || i === points.length - 1) {
-        const dot = new THREE.Mesh(dotGeo, dotMat);
-        dot.position.copy(pt);
-        this.pathPointsGroup.add(dot);
-      }
-    });
+    // Glowing directional chevron arrows along the curve
+    const chevronCount = Math.max(4, Math.floor(points.length * 1.5));
+    const arrowMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+    for (let i = 1; i <= chevronCount; i++) {
+      const t = i / (chevronCount + 1);
+      const pos = curve.getPoint(t);
+      const tangent = curve.getTangent(t);
+
+      const arrowGeo = new THREE.ConeGeometry(0.12, 0.28, 3);
+      const arrow = new THREE.Mesh(arrowGeo, arrowMat);
+      arrow.position.set(pos.x, 0.18, pos.z);
+
+      const lookTarget = pos.clone().add(tangent);
+      arrow.lookAt(lookTarget);
+      arrow.rotateX(Math.PI / 2);
+      this.pathChevronsGroup.add(arrow);
+    }
   }
 
-  // Update target robot pose for smooth 60fps interpolation
   updateRobotPose(robotPosition) {
-    if (!robotPosition || !robotPosition.grid) return;
-
-    const wx = robotPosition.grid.x - 10;
-    const wz = robotPosition.grid.y - 10;
+    if (!robotPosition) return;
+    const wx = robotPosition.world ? robotPosition.world.x : (robotPosition.grid.x - 10);
+    const wz = robotPosition.world ? robotPosition.world.z : (robotPosition.grid.y - 10);
     this.robotTargetPos.set(wx, 0, wz);
 
-    // Convert heading in degrees to radians
-    // 0 deg in controller is North (-Z direction in Three.js)
     if (typeof robotPosition.heading === 'number') {
       this.robotTargetHeading = THREE.MathUtils.degToRad(-robotPosition.heading + 180);
     }
   }
 
-  // Update active destination beacon
   updateDestination(destination) {
     this.currentDestination = destination;
 
-    // Turn off all beacons, turn on active one
+    // Toggle destination beacons
     this.beaconMeshes.forEach((beacon, id) => {
-      const isActive = destination && destination.id === id;
-      beacon.material.opacity = isActive ? 0.45 : 0.0;
+      const isActive = destination && (destination.id === id || (id === 'computer_lab' && destination.id === 'classroom'));
+      beacon.material.opacity = isActive ? 0.5 : 0.0;
       if (beacon.userData.targetRing) {
         beacon.userData.targetRing.material.opacity = isActive ? 0.9 : 0.0;
       }
     });
+
+    // Position destination 3D pin marker above destination building entrance
+    if (this.destinationPin) {
+      if (destination) {
+        this.destinationPin.visible = true;
+        this.destinationPin.position.set(destination.worldPos.x, 0, destination.worldPos.z + 1.2);
+      } else {
+        this.destinationPin.visible = false;
+      }
+    }
   }
 
-  // Switch camera modes
   setCameraMode(mode) {
-    const prevMode = this.cameraMode;
-    this.cameraMode = mode; // 'perspective' | 'grid' | 'follow'
-
+    this.cameraMode = mode;
     if (mode === 'grid') {
-      // 2D Tactical Radar overhead view
       this.controls.enableRotate = false;
-      this.controls.target.set(0, 0, 0);
-    } else if (mode === 'perspective') {
-      // Isometric 3D view
-      this.controls.enableRotate = true;
-      if (prevMode === 'grid' || prevMode === 'follow') {
-        this.cameraTargetPos = new THREE.Vector3(16, 20, 20);
-        this.isTransitioningCamera = true;
-      }
-    } else if (mode === 'follow') {
-      // Third-person chase camera
-      this.controls.enableRotate = false;
-    }
-  }
-
-  setShowGrid(show) {
-    this.showGrid = show;
-    if (this.gridHelper) {
-      this.gridHelper.visible = show;
-    }
-  }
-
-  // Raycasting & Pointer Events
-  onPointerMove(e) {
-    const rect = this.renderer.domElement.getBoundingClientRect();
-    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-    this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-    const intersects = this.raycaster.intersectObjects([this.groundMesh]);
-
-    if (intersects.length > 0) {
-      const pt = intersects[0].point;
-      const gridX = Math.min(19, Math.max(1, Math.round(pt.x + 10)));
-      const gridY = Math.min(19, Math.max(1, Math.round(pt.z + 10)));
-
-      this.isHoveringGround = true;
-      this.hoveredGrid = { x: gridX, y: gridY };
-
-      if (this.hoverPreviewMesh) {
-        this.hoverPreviewMesh.position.set(gridX - 10, 0, gridY - 10);
-        this.hoverPreviewMesh.visible = true;
-      }
+      this.controls.target.set(0, 0, -1);
     } else {
-      this.isHoveringGround = false;
-      if (this.hoverPreviewMesh) {
-        this.hoverPreviewMesh.visible = false;
-      }
-    }
-  }
-
-  onPointerDown(e) {
-    this.isTransitioningCamera = false;
-    // Only handle primary click
-    if (e.button !== 0) return;
-
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-
-    // 1. Check if clicked on an existing obstacle
-    const obstacleObjects = [];
-    this.obstacleMeshes.forEach(mesh => {
-      mesh.traverse(child => obstacleObjects.push(child));
-    });
-
-    const obsIntersects = this.raycaster.intersectObjects(obstacleObjects, false);
-    if (obsIntersects.length > 0) {
-      let topGroup = obsIntersects[0].object;
-      while (topGroup.parent && !topGroup.userData?.isObstacle) {
-        topGroup = topGroup.parent;
-      }
-      if (topGroup.userData?.id) {
-        if (this.callbacks.onRemoveObstacle) {
-          this.callbacks.onRemoveObstacle(topGroup.userData.id);
-        }
-        return;
-      }
-    }
-
-    // 2. Otherwise place new obstacle on ground
-    const groundIntersects = this.raycaster.intersectObjects([this.groundMesh]);
-    if (groundIntersects.length > 0) {
-      const pt = groundIntersects[0].point;
-      const gridX = Math.min(19, Math.max(1, Math.round(pt.x + 10)));
-      const gridY = Math.min(19, Math.max(1, Math.round(pt.z + 10)));
-
-      if (this.callbacks.onAddObstacleAtClick) {
-        this.callbacks.onAddObstacleAtClick({
-          id: `obs-${Date.now()}`,
-          grid: { x: gridX, y: gridY },
-          world: { x: gridX - 10, y: 0, z: gridY - 10 },
-          label: `Hazard [${gridX},${gridY}]`
-        });
-      }
-    }
-  }
-
-  onPointerLeave() {
-    this.isHoveringGround = false;
-    if (this.hoverPreviewMesh) {
-      this.hoverPreviewMesh.visible = false;
+      this.controls.enableRotate = true;
     }
   }
 
@@ -1018,100 +1193,129 @@ export class ThreeEngine {
     if (!this.container || !this.renderer || !this.camera) return;
     const width = this.container.clientWidth;
     const height = this.container.clientHeight;
-
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
   }
 
-  // Animation & Rendering Loop
+  onPointerMove(e) {
+    const rect = this.renderer.domElement.getBoundingClientRect();
+    this.mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+    this.mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+    this.raycaster.setFromCamera(this.mouse, this.camera);
+    const intersects = this.raycaster.intersectObjects([this.groundMesh], false);
+
+    if (intersects.length > 0) {
+      this.isHoveringGround = true;
+      const pt = intersects[0].point;
+      const gx = Math.min(19, Math.max(1, Math.round(pt.x + 10)));
+      const gy = Math.min(19, Math.max(1, Math.round(pt.z + 10)));
+      this.hoveredGrid = { x: gx, y: gy };
+
+      if (this.hoverPreviewMesh) {
+        this.hoverPreviewMesh.position.set(gx - 10, 0, gy - 10);
+        this.hoverPreviewMesh.visible = true;
+      }
+    } else {
+      this.isHoveringGround = false;
+      if (this.hoverPreviewMesh) this.hoverPreviewMesh.visible = false;
+    }
+  }
+
+  onPointerDown(e) {
+    if (e.button !== 0) return;
+    if (this.isHoveringGround && this.callbacks.onAddObstacleAtClick) {
+      this.callbacks.onAddObstacleAtClick({
+        id: `obs-${Date.now()}`,
+        grid: { ...this.hoveredGrid },
+        world: { x: this.hoveredGrid.x - 10, y: 0, z: this.hoveredGrid.y - 10 },
+        label: `Barricade [${this.hoveredGrid.x},${this.hoveredGrid.y}]`
+      });
+    }
+  }
+
+  onPointerLeave() {
+    this.isHoveringGround = false;
+    if (this.hoverPreviewMesh) this.hoverPreviewMesh.visible = false;
+  }
+
   animate() {
     this.animationFrameId = requestAnimationFrame(this.animate);
     const delta = this.clock.getDelta();
     const elapsedTime = this.clock.getElapsedTime();
 
-    // 1. Smoothly interpolate robot position (LERP)
+    // 1. Robot position and rotation interpolation
     if (this.robotGroup) {
       this.robotGroup.position.lerp(this.robotTargetPos, 0.12);
 
-      // Smooth heading rotation
-      let diff = this.robotTargetHeading - this.robotGroup.rotation.y;
-      while (diff < -Math.PI) diff += Math.PI * 2;
-      while (diff > Math.PI) diff -= Math.PI * 2;
-      this.robotGroup.rotation.y += diff * 0.14;
-    }
+      let angleDiff = this.robotTargetHeading - this.robotGroup.rotation.y;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+      while (angleDiff > Math.PI) angleDiff -= Math.PI * 2;
+      this.robotGroup.rotation.y += angleDiff * 0.12;
 
-    // 2. Spin LiDAR sensor
-    if (this.lidarPuck) {
-      this.lidarPuck.rotation.y += delta * 12.0;
-    }
-
-    // 3. Spin rover wheels dynamically when driving
-    if (this.robotWheels && this.robotWheels.length > 0) {
-      const isMoving = this.status === 'moving' || this.status === 'avoiding_obstacle';
-      if (isMoving) {
-        const wheelSpin = delta * 10.0;
-        this.robotWheels.forEach((wheel) => {
-          wheel.rotation.x -= wheelSpin;
-        });
+      // Spin LiDAR
+      if (this.lidarPuck) {
+        this.lidarPuck.rotation.y += delta * 12.0;
       }
-    }
 
-    // 4. Animate floating hazard diamonds
-    this.obstacleMeshes.forEach((mesh) => {
-      const diamond = mesh.getObjectByName('floating_diamond');
-      if (diamond) {
-        diamond.rotation.y += delta * 2.0;
-        diamond.position.y = 1.35 + Math.sin(elapsedTime * 3.5) * 0.08;
-      }
-    });
-
-    // 4. Animate active destination beacon
-    this.beaconMeshes.forEach((beacon) => {
-      if (beacon.material.opacity > 0) {
-        beacon.rotation.y += delta * 0.8;
-        if (beacon.userData.targetRing) {
-          const scale = 1.0 + Math.sin(elapsedTime * 4.0) * 0.08;
-          beacon.userData.targetRing.scale.set(scale, scale, 1);
+      // Spin Wheels during movement
+      if (this.robotWheels && this.robotWheels.length > 0) {
+        const isMoving = this.status === 'moving' || this.status === 'avoiding_obstacle';
+        if (isMoving) {
+          const wheelSpin = delta * 10.0;
+          this.robotWheels.forEach((wheel) => {
+            wheel.rotation.x -= wheelSpin;
+          });
         }
       }
+    }
+
+    // 2. Animate Water Fountain Spray Particles
+    if (this.fountainParticles.length > 0) {
+      this.fountainParticles.forEach((p) => {
+        p.userData.progress += delta * p.userData.speed;
+        if (p.userData.progress > 1.0) p.userData.progress = 0;
+
+        const t = p.userData.progress;
+        // Parabolic arc: rise then fall
+        const y = 1.95 + Math.sin(t * Math.PI) * 1.1;
+        const r = t * p.userData.radiusMax;
+        const x = Math.cos(p.userData.angle) * r;
+        const z = Math.sin(p.userData.angle) * r;
+        p.position.set(x, y, z);
+      });
+    }
+
+    // 3. Animate Obstacle Alert Badges
+    this.obstacleMeshes.forEach((mesh) => {
+      const badge = mesh.getObjectByName('alert_badge');
+      if (badge) {
+        badge.position.y = 1.65 + Math.sin(elapsedTime * 4.0) * 0.08;
+      }
     });
 
-    // 5. Camera mode management
+    // 4. Animate Destination Pin bobbing
+    if (this.destinationPin && this.destinationPin.visible) {
+      this.destinationPin.position.y = Math.sin(elapsedTime * 3.5) * 0.15;
+    }
+
+    // 5. Camera mode handling
     if (this.cameraMode === 'grid') {
-      // Smoothly fly camera to overhead radar position (0, 32, 0.001)
-      this.camera.position.lerp(new THREE.Vector3(0, 32, 0.001), 0.08);
-      this.controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.08);
+      this.camera.position.lerp(new THREE.Vector3(0, 32, -1.001), 0.08);
+      this.controls.target.lerp(new THREE.Vector3(0, 0, -1), 0.08);
     } else if (this.cameraMode === 'follow' && this.robotGroup) {
-      // Follow Cam: 5.5m behind robot's heading, 3.8m up
       const heading = this.robotGroup.rotation.y;
       const behindX = this.robotGroup.position.x - Math.sin(heading) * 6.5;
       const behindZ = this.robotGroup.position.z - Math.cos(heading) * 6.5;
-
-      const targetCamPos = new THREE.Vector3(behindX, 4.2, behindZ);
-      this.camera.position.lerp(targetCamPos, 0.08);
-
-      const lookTarget = new THREE.Vector3(
-        this.robotGroup.position.x,
-        this.robotGroup.position.y + 0.5,
-        this.robotGroup.position.z
-      );
-      this.controls.target.lerp(lookTarget, 0.12);
-    } else if (this.cameraMode === 'perspective') {
-      if (this.isTransitioningCamera && this.cameraTargetPos) {
-        this.camera.position.lerp(this.cameraTargetPos, 0.08);
-        this.controls.target.lerp(new THREE.Vector3(0, 0, 0), 0.08);
-        if (this.camera.position.distanceTo(this.cameraTargetPos) < 0.2) {
-          this.isTransitioningCamera = false;
-        }
-      }
+      this.camera.position.lerp(new THREE.Vector3(behindX, 4.5, behindZ), 0.08);
+      this.controls.target.lerp(this.robotGroup.position.clone().add(new THREE.Vector3(0, 0.5, 0)), 0.12);
     }
 
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
   }
 
-  // Agent 2 Delegate Interface Bridge
   attachDelegate() {
     simulationController.attachEngine(this);
   }
@@ -1121,23 +1325,19 @@ export class ThreeEngine {
   }
 
   addObstacle(obstacle) {
-    // When obstacle is added, check if active route intersects and replan
     if (simulationController.state.status === 'moving' && simulationController.state.currentDestination) {
       simulationController.checkObstacleCollisionAndReplan(obstacle);
     }
   }
 
   removeObstacle(id) {
-    // When obstacle is removed, re-check route if moving
     if (simulationController.state.status === 'moving' && simulationController.state.currentDestination) {
       const newRoute = simulationController.generatePath(
         simulationController.state.robotPosition.grid,
         simulationController.state.currentDestination.gridPos,
         simulationController.state.obstacles
       );
-      if (newRoute) {
-        simulationController.setState({ activeRoute: newRoute });
-      }
+      if (newRoute) simulationController.setState({ activeRoute: newRoute });
     }
   }
 
@@ -1148,56 +1348,38 @@ export class ThreeEngine {
         simulationController.state.currentDestination.gridPos,
         []
       );
-      if (newRoute) {
-        simulationController.setState({ activeRoute: newRoute });
-      }
+      if (newRoute) simulationController.setState({ activeRoute: newRoute });
     }
   }
 
   resetSimulation() {
     this.updateDestination(null);
-    this.robotTargetPos.set(0, 0, 0);
-    this.robotTargetHeading = 0;
+    this.robotTargetPos.set(-5, 0, 5.5);
+    this.robotTargetHeading = THREE.MathUtils.degToRad(-45 + 180);
     if (this.robotGroup) {
-      this.robotGroup.position.set(0, 0, 0);
-      this.robotGroup.rotation.y = 0;
+      this.robotGroup.position.set(-5, 0, 5.5);
+      this.robotGroup.rotation.y = this.robotTargetHeading;
     }
     this.syncRoute([], 'idle');
   }
 
-  pauseNavigation() {
-    // Can pause any engine-specific visual effects if needed
-  }
+  pauseNavigation() {}
+  resumeNavigation() {}
+  setSpeed() {}
 
-  resumeNavigation() {
-    // Can resume any engine-specific visual effects if needed
-  }
-
-  setSpeed(multiplier) {
-    // Adapt engine timing if necessary
-  }
-
-  // Destroy and free memory
   dispose() {
-    if (this.animationFrameId) {
-      cancelAnimationFrame(this.animationFrameId);
-    }
-
+    if (this.animationFrameId) cancelAnimationFrame(this.animationFrameId);
     window.removeEventListener('resize', this.boundOnResize);
     if (this.renderer && this.renderer.domElement) {
       this.renderer.domElement.removeEventListener('pointermove', this.boundOnPointerMove);
       this.renderer.domElement.removeEventListener('pointerdown', this.boundOnPointerDown);
       this.renderer.domElement.removeEventListener('pointerleave', this.boundOnPointerLeave);
-
       if (this.renderer.domElement.parentNode) {
         this.renderer.domElement.parentNode.removeChild(this.renderer.domElement);
       }
       this.renderer.dispose();
     }
-
-    if (this.controls) {
-      this.controls.dispose();
-    }
+    if (this.controls) this.controls.dispose();
   }
 }
 

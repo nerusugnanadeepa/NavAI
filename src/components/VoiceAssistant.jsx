@@ -2,27 +2,41 @@ import React, { useState, useEffect } from 'react';
 import { 
   Mic, 
   MicOff, 
+  Volume2, 
   Sparkles, 
   HelpCircle, 
-  AlertCircle,
-  Volume2
+  AlertCircle 
 } from 'lucide-react';
 import { speechInput } from '../voice/speechInput';
 import { speechOutput } from '../voice/speechOutput';
 import { SUPPORTED_LANGUAGES, LANGUAGE_UI_TEXTS } from '../voice/languages';
 
-export function VoiceAssistant({ onCommandRecognized, currentLanguage = 'en' }) {
+export function VoiceAssistant({ 
+  onCommandRecognized, 
+  currentLanguage = 'en',
+  guidanceText,
+  status = 'idle',
+  currentDestination
+}) {
   const uiTexts = LANGUAGE_UI_TEXTS[currentLanguage] || LANGUAGE_UI_TEXTS.en;
   const currentLangObj = SUPPORTED_LANGUAGES.find(l => l.code === currentLanguage) || SUPPORTED_LANGUAGES[0];
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
-  const [lastCommand, setLastCommand] = useState(null);
+  const [showQuickPhrases, setShowQuickPhrases] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const isSupported = speechInput.isSupported();
 
+  // Reference image text fallback
+  const defaultGuidance = uiTexts.speech?.obstacleDetected
+    ? uiTexts.speech.obstacleDetected(currentDestination?.name || 'Library', 'right')
+    : 'Obstacle ahead. Recalculating route.\nTurn right and continue towards Library.';
+
+  const displayGuidance = guidanceText || defaultGuidance;
+
   const handleToggleListen = () => {
     if (!isSupported) {
-      setErrorMessage('Speech recognition is not supported in this browser. Use the UI controls.');
+      // If mic not supported, speak the guidance text as an audio demonstration
+      speechOutput.speak(displayGuidance, true);
       return;
     }
 
@@ -31,11 +45,10 @@ export function VoiceAssistant({ onCommandRecognized, currentLanguage = 'en' }) 
       setIsListening(false);
     } else {
       setErrorMessage('');
-      setTranscript('Listening for command...');
+      setTranscript('Listening for voice command...');
       const started = speechInput.startListening(
         ({ transcript: heardText, command }) => {
           setTranscript(`"${heardText}"`);
-          setLastCommand(command);
           if (onCommandRecognized) {
             onCommandRecognized(command, heardText);
           }
@@ -45,7 +58,7 @@ export function VoiceAssistant({ onCommandRecognized, currentLanguage = 'en' }) 
         },
         (error) => {
           setIsListening(false);
-          setErrorMessage(`Mic notice: ${error}. Please check mic permissions.`);
+          setErrorMessage(`Mic notice: ${error}`);
         }
       );
 
@@ -55,81 +68,89 @@ export function VoiceAssistant({ onCommandRecognized, currentLanguage = 'en' }) 
     }
   };
 
+  const handleSpeakGuidance = (e) => {
+    e.stopPropagation();
+    speechOutput.speak(displayGuidance, true);
+  };
+
   const handleQuickCommand = (samplePhrase) => {
     const parsed = speechInput.parseCommand(samplePhrase);
     setTranscript(`"${samplePhrase}"`);
-    setLastCommand(parsed);
     if (onCommandRecognized) {
       onCommandRecognized(parsed, samplePhrase);
     }
   };
 
   return (
-    <div className="glass-panel">
-      <div className="card-header">
-        <h2 className="card-title">
-          <Sparkles size={18} color="#A855F7" />
-          Voice AI Assistant
-        </h2>
-        <span className="badge badge-planning" style={{ background: 'rgba(168, 85, 247, 0.2)' }}>
-          {currentLangObj.native} ({currentLangObj.langTag})
+    <div className="hud-card voice-assistant-card">
+      <div className="hud-card-header justify-between">
+        <span className="hud-card-title flex items-center gap-1.5">
+          <Sparkles size={13} className="text-blue-400" />
+          Voice Assistant
         </span>
-      </div>
-
-      <div className="card-body">
-        {/* Mic control & waveform */}
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5">
           <button
             type="button"
-            className={`btn btn-icon ${isListening ? 'btn-danger animate-pulse' : 'btn-cyan'}`}
-            onClick={handleToggleListen}
-            title={isListening ? 'Stop listening' : 'Start voice command'}
-            style={isListening ? { background: '#EF4444', borderColor: '#EF4444' } : {}}
+            className="hud-mini-btn"
+            onClick={handleSpeakGuidance}
+            title="Read guidance aloud"
           >
-            {isListening ? <MicOff size={20} color="#fff" /> : <Mic size={20} />}
+            <Volume2 size={12} />
           </button>
+          <button
+            type="button"
+            className="hud-mini-btn"
+            onClick={() => setShowQuickPhrases(!showQuickPhrases)}
+            title="Toggle Quick Voice Phrases"
+          >
+            <HelpCircle size={12} />
+          </button>
+        </div>
+      </div>
 
-          <div className="flex-1">
-            <div className="text-xs font-semibold text-white-soft">
-              {isListening ? 'Listening for voice command...' : 'Click mic to speak command'}
-            </div>
-            <div className="text-xs text-slate-400 font-mono mt-0.5">
-              {transcript || uiTexts.sampleVoice}
-            </div>
-          </div>
-
-          {isListening && (
-            <div className="voice-wave-container">
-              <div className="voice-wave-bar" />
-              <div className="voice-wave-bar" />
-              <div className="voice-wave-bar" />
-              <div className="voice-wave-bar" />
-              <div className="voice-wave-bar" />
-            </div>
-          )}
+      <div className="voice-assistant-body">
+        {/* Glowing Blue Circular Mic Button (Matches Reference Image exactly!) */}
+        <div className="voice-mic-column">
+          <button
+            type="button"
+            className={`voice-circle-mic-btn ${isListening ? 'listening' : ''}`}
+            onClick={handleToggleListen}
+            title={isListening ? 'Stop listening' : 'Click to speak or listen'}
+          >
+            {isListening ? (
+              <MicOff size={24} color="#ffffff" />
+            ) : (
+              <Mic size={24} color="#ffffff" />
+            )}
+            <div className="voice-mic-glow-ring" />
+          </button>
         </div>
 
-        {/* Last recognized command tag */}
-        {lastCommand && lastCommand.type !== 'UNKNOWN' && (
-          <div className="system-stat-pill justify-between bg-purple-950/40 border-purple-500/40 text-xs text-purple-300">
-            <span>Action: <strong>{lastCommand.type}</strong></span>
-            {lastCommand.name && <span>Target: <strong>{lastCommand.name}</strong></span>}
-          </div>
-        )}
+        {/* Live Spoken Guidance Typography (Matches Reference Image!) */}
+        <div className="voice-guidance-content">
+          <p className="voice-guidance-text">
+            {displayGuidance}
+          </p>
+          {transcript && (
+            <p className="voice-transcript-sub">
+              Heard: {transcript}
+            </p>
+          )}
+        </div>
+      </div>
 
-        {/* Quick click suggestions (Localized Voice simulation/touch fallback) */}
-        <div>
-          <div className="text-xs text-slate-400 mb-2 flex items-center gap-1">
-            <HelpCircle size={12} />
-            <span>Try spoken or simulated commands ({currentLangObj.native}):</span>
+      {/* Expandable Multilingual Quick Command Pills */}
+      {showQuickPhrases && (
+        <div className="voice-quick-phrases-panel">
+          <div className="text-[10px] text-slate-400 mb-1 font-semibold flex items-center justify-between">
+            <span>Quick Spoken Commands ({currentLangObj.native}):</span>
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {uiTexts.quickPhrases.map((phrase) => (
+          <div className="flex flex-wrap gap-1">
+            {uiTexts.quickPhrases.slice(0, 6).map((phrase) => (
               <button
                 key={phrase}
                 type="button"
-                className="hud-btn"
-                style={{ fontSize: '11px', padding: '4px 8px' }}
+                className="voice-quick-pill"
                 onClick={() => handleQuickCommand(phrase)}
               >
                 "{phrase}"
@@ -137,15 +158,14 @@ export function VoiceAssistant({ onCommandRecognized, currentLanguage = 'en' }) 
             ))}
           </div>
         </div>
+      )}
 
-        {/* Error notification if mic unsupported or blocked */}
-        {errorMessage && (
-          <div className="simulation-disclaimer border-amber-500/50 text-amber-300 text-xs">
-            <AlertCircle size={14} className="flex-shrink-0" />
-            <span>{errorMessage}</span>
-          </div>
-        )}
-      </div>
+      {errorMessage && (
+        <div className="voice-error-text">
+          <AlertCircle size={11} className="inline mr-1" />
+          {errorMessage}
+        </div>
+      )}
     </div>
   );
 }
