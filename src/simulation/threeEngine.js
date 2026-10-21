@@ -1226,6 +1226,13 @@ export class ThreeEngine {
     }
   }
 
+  setShowGrid(show) {
+    this.showGrid = Boolean(show);
+    if (this.gridHelper) {
+      this.gridHelper.visible = this.showGrid;
+    }
+  }
+
   onResize() {
     if (!this.container || !this.renderer || !this.camera) return;
     const width = this.container.clientWidth || window.innerWidth;

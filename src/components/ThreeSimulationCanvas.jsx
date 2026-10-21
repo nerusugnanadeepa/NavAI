@@ -103,14 +103,14 @@ export function ThreeSimulationCanvas({
 
   // Sync camera mode
   useEffect(() => {
-    if (engineRef.current) {
+    if (engineRef.current && typeof engineRef.current.setCameraMode === 'function') {
       engineRef.current.setCameraMode(cameraMode);
     }
   }, [cameraMode]);
 
   // Sync grid visibility
   useEffect(() => {
-    if (engineRef.current) {
+    if (engineRef.current && typeof engineRef.current.setShowGrid === 'function') {
       engineRef.current.setShowGrid(showGrid);
     }
   }, [showGrid]);
