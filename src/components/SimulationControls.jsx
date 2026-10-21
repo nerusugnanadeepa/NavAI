@@ -6,7 +6,11 @@ import {
   AlertTriangle, 
   Trash2, 
   SlidersHorizontal,
-  FastForward
+  FastForward,
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight
 } from 'lucide-react';
 
 export function SimulationControls({
@@ -18,6 +22,10 @@ export function SimulationControls({
   onReset,
   onAddObstacle,
   onClearObstacles,
+  onMoveForward,
+  onMoveBackward,
+  onTurnLeft,
+  onTurnRight,
   speed,
   onSetSpeed,
   obstacleCount
@@ -115,6 +123,53 @@ export function SimulationControls({
               <Trash2 size={16} />
               <span>Clear ({obstacleCount})</span>
             </button>
+          </div>
+
+          {/* Directional Drive Commands for Simulated Robot */}
+          <div className="directional-drive-cluster">
+            <div className="dpad-header">
+              <span>Manual Robot Drive Commands:</span>
+            </div>
+            <div className="dpad-layout">
+              <button
+                type="button"
+                className="dpad-btn"
+                onClick={onMoveForward}
+                title="Command: Move Forward"
+              >
+                <ArrowUp size={15} />
+                <span>Forward</span>
+              </button>
+              <div className="dpad-row">
+                <button
+                  type="button"
+                  className="dpad-btn"
+                  onClick={onTurnLeft}
+                  title="Command: Turn Left 90°"
+                >
+                  <ArrowLeft size={15} />
+                  <span>Turn Left</span>
+                </button>
+                <button
+                  type="button"
+                  className="dpad-btn"
+                  onClick={onTurnRight}
+                  title="Command: Turn Right 90°"
+                >
+                  <span>Turn Right</span>
+                  <ArrowRight size={15} />
+                </button>
+              </div>
+              <button
+                type="button"
+                className="dpad-btn"
+                onClick={onMoveBackward}
+                title="Command: Move Backward"
+              >
+                <ArrowDown size={15} />
+                <span>Reverse</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

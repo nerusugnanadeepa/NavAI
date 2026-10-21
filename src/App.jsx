@@ -32,6 +32,7 @@ import {
 } from './components/WelcomeModal';
 import { useSimulation } from './hooks/useSimulation';
 import { speechOutput } from './voice/speechOutput';
+import { speechInput } from './voice/speechInput';
 import './App.css';
 
 export function App() {
@@ -53,10 +54,16 @@ export function App() {
     addObstacle,
     removeObstacle,
     clearObstacles,
-    setSpeed
+    setSpeed,
+    moveForward,
+    moveBackward,
+    turnLeft,
+    turnRight,
+    executeCommand
   } = useSimulation();
 
   const [isMuted, setIsMuted] = useState(false);
+  const [isListening, setIsListening] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [events, setEvents] = useState([
     {
@@ -171,15 +178,74 @@ export function App() {
     speechOutput.setMuted(next);
   };
 
-  // Handle Voice Assistant Command
+  // Handle Header mic toggle
+  const handleToggleHeaderVoice = () => {
+    if (!speechInput.isSupported()) {
+      addLogEvent('Speech recognition not supported in browser. Use typing in command bar.', 'alert');
+      return;
+    }
+    if (isListening) {
+      speechInput.stopListening();
+      setIsListening(false);
+    } else {
+      setIsListening(true);
+      speechInput.startListening(
+        ({ transcript: heardText, command }) => {
+          setIsListening(false);
+          handleVoiceCommand(command, heardText);
+        },
+        ({ state }) => {
+          setIsListening(state === 'listening');
+        },
+        (err) => {
+          setIsListening(false);
+          addLogEvent(`Mic notice: ${err}`, 'alert');
+        }
+      );
+    }
+  };
+
+  // Handle Voice / Text Assistant Command
   const handleVoiceCommand = (command, transcript) => {
-    addLogEvent(`Voice Command heard: "${transcript}"`, 'voice');
+    addLogEvent(`Command heard/entered: "${transcript}"`, 'voice');
 
     if (!command) return;
 
     switch (command.type) {
-      case 'SELECT_DESTINATION':
-        handleSelectDestination(command.destinationId);
+      case 'NAVIGATE_TO':
+      case 'SELECT_DESTINATION': {
+        const dest = selectDestination(command.destinationId);
+        if (dest) {
+          addLogEvent(`Command executed: Driving to ${dest.name}.`, 'nav');
+          startNavigation(command.destinationId);
+        }
+        break;
+      }
+      case 'MOVE_FORWARD': {
+        const moved = moveForward();
+        addLogEvent(moved ? `Command executed: Moving forward.` : `Obstacle ahead! Cannot move forward.`, moved ? 'nav' : 'alert');
+        break;
+      }
+      case 'MOVE_BACKWARD': {
+        const moved = moveBackward();
+        addLogEvent(moved ? `Command executed: Reversing backward.` : `Obstacle behind! Cannot reverse.`, moved ? 'nav' : 'alert');
+        break;
+      }
+      case 'TURN_LEFT':
+        turnLeft();
+        addLogEvent(`Command executed: Turned left 90°.`, 'nav');
+        break;
+      case 'TURN_RIGHT':
+        turnRight();
+        addLogEvent(`Command executed: Turned right 90°.`, 'nav');
+        break;
+      case 'SPEED_UP':
+        setSpeed(Math.min(3.0, (speed || 1.0) + 0.5));
+        addLogEvent(`Command executed: Speed increased.`, 'nav');
+        break;
+      case 'SLOW_DOWN':
+        setSpeed(Math.max(0.5, (speed || 1.0) - 0.5));
+        addLogEvent(`Command executed: Speed decreased.`, 'nav');
         break;
       case 'START_NAVIGATION':
         handleStartNavigation();
@@ -206,13 +272,19 @@ export function App() {
 
   return (
     <div className="app-container">
-      {/* Header */}
+      {/* Header with Command Bar */}
       <AppHeader
         status={status}
         isMuted={isMuted}
         onToggleMute={handleToggleMute}
         onOpenHelp={() => setShowWelcome(true)}
         stats={stats}
+        onExecuteCommand={(cmdStr) => {
+          const parsed = speechInput.parseCommand(cmdStr);
+          handleVoiceCommand(parsed, cmdStr);
+        }}
+        isListening={isListening}
+        onToggleVoice={handleToggleHeaderVoice}
       />
 
       {/* Main Responsive Grid Layout */}
@@ -268,6 +340,10 @@ export function App() {
             onReset={handleResetSimulation}
             onAddObstacle={handleAddObstacle}
             onClearObstacles={handleClearObstacles}
+            onMoveForward={() => handleVoiceCommand({ type: 'MOVE_FORWARD' }, 'move forward')}
+            onMoveBackward={() => handleVoiceCommand({ type: 'MOVE_BACKWARD' }, 'move backward')}
+            onTurnLeft={() => handleVoiceCommand({ type: 'TURN_LEFT' }, 'turn left')}
+            onTurnRight={() => handleVoiceCommand({ type: 'TURN_RIGHT' }, 'turn right')}
             speed={speed}
             onSetSpeed={setSpeed}
             obstacleCount={obstacles.length}

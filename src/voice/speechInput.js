@@ -88,33 +88,55 @@ export class SpeechInputEngine {
   }
 
   parseCommand(text) {
-    const clean = text.toLowerCase();
+    const clean = text.toLowerCase().trim();
 
-    // Check Destination commands
+    // Check Destination navigation commands (immediate move to destination)
     if (clean.includes('library')) {
-      return { type: 'SELECT_DESTINATION', destinationId: 'library', name: 'Library' };
+      return { type: 'NAVIGATE_TO', destinationId: 'library', name: 'Library' };
     }
     if (clean.includes('classroom') || clean.includes('class')) {
-      return { type: 'SELECT_DESTINATION', destinationId: 'classroom', name: 'Classroom Block' };
+      return { type: 'NAVIGATE_TO', destinationId: 'classroom', name: 'Classroom Block' };
     }
     if (clean.includes('cafeteria') || clean.includes('cafe') || clean.includes('canteen')) {
-      return { type: 'SELECT_DESTINATION', destinationId: 'cafeteria', name: 'Cafeteria' };
+      return { type: 'NAVIGATE_TO', destinationId: 'cafeteria', name: 'Cafeteria' };
     }
     if (clean.includes('main gate') || clean.includes('gate') || clean.includes('entrance')) {
-      return { type: 'SELECT_DESTINATION', destinationId: 'main_gate', name: 'Main Gate' };
+      return { type: 'NAVIGATE_TO', destinationId: 'main_gate', name: 'Main Gate' };
+    }
+
+    // Directional robot movement commands
+    if (clean.includes('forward') || clean.includes('straight') || clean.includes('ahead')) {
+      return { type: 'MOVE_FORWARD' };
+    }
+    if (clean.includes('backward') || clean.includes('reverse') || clean.includes('back')) {
+      return { type: 'MOVE_BACKWARD' };
+    }
+    if (clean.includes('turn left') || clean.includes('left')) {
+      return { type: 'TURN_LEFT' };
+    }
+    if (clean.includes('turn right') || clean.includes('right')) {
+      return { type: 'TURN_RIGHT' };
+    }
+
+    // Speed adjustments
+    if (clean.includes('faster') || clean.includes('speed up')) {
+      return { type: 'SPEED_UP' };
+    }
+    if (clean.includes('slower') || clean.includes('slow down')) {
+      return { type: 'SLOW_DOWN' };
     }
 
     // Check Navigation Control commands
     if (clean.includes('start') || clean.includes('navigate') || clean.includes('go')) {
       return { type: 'START_NAVIGATION' };
     }
-    if (clean.includes('pause') || clean.includes('hold') || clean.includes('stop')) {
+    if (clean.includes('pause') || clean.includes('hold') || clean.includes('stop') || clean.includes('halt')) {
       return { type: 'PAUSE_NAVIGATION' };
     }
     if (clean.includes('resume') || clean.includes('continue')) {
       return { type: 'RESUME_NAVIGATION' };
     }
-    if (clean.includes('reset') || clean.includes('restart') || clean.includes('origin')) {
+    if (clean.includes('reset') || clean.includes('restart') || clean.includes('origin') || clean.includes('dock')) {
       return { type: 'RESET_SIMULATION' };
     }
     // Prioritize removal commands first

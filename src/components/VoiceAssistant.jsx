@@ -124,6 +124,10 @@ export function VoiceAssistant({ onCommandRecognized }) {
             {[
               'Go to Library',
               'Navigate to Cafeteria',
+              'Move Forward',
+              'Turn Left',
+              'Turn Right',
+              'Move Backward',
               'Pause Navigation',
               'Resume Navigation',
               'Reset Simulation',

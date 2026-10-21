@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Bot, 
   Volume2, 
@@ -8,11 +8,30 @@ import {
   Compass, 
   Radio, 
   ShieldAlert,
-  HelpCircle
+  HelpCircle,
+  Mic
 } from 'lucide-react';
 import { speechOutput } from '../voice/speechOutput';
 
-export function AppHeader({ status, isMuted, onToggleMute, onOpenHelp, stats }) {
+export function AppHeader({ 
+  status, 
+  isMuted, 
+  onToggleMute, 
+  onOpenHelp, 
+  stats,
+  onExecuteCommand,
+  isListening,
+  onToggleVoice
+}) {
+  const [commandText, setCommandText] = useState('Go to the library');
+
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (commandText.trim() && onExecuteCommand) {
+      onExecuteCommand(commandText.trim());
+    }
+  };
+
   const getStatusBadge = () => {
     switch (status) {
       case 'moving':
@@ -44,6 +63,30 @@ export function AppHeader({ status, isMuted, onToggleMute, onOpenHelp, stats }) 
           </h1>
           <p className="brand-tagline">Your Voice. Your Vision. Your Way.</p>
         </div>
+      </div>
+ 
+      {/* Center Interactive Command Bar (Matches Picture!) */}
+      <div className="header-command-container">
+        <form className="header-command-bar" onSubmit={handleSubmit}>
+          <button
+            type="button"
+            className={`command-mic-btn ${isListening ? 'listening animate-pulse' : ''}`}
+            onClick={onToggleVoice}
+            title={isListening ? 'Listening for speech command...' : 'Click to speak command'}
+          >
+            <Mic size={17} />
+          </button>
+          <input
+            type="text"
+            className="command-input"
+            value={commandText}
+            onChange={(e) => setCommandText(e.target.value)}
+            placeholder="'Go to the library' or 'move forward', 'turn left'"
+          />
+          <button type="submit" className="command-send-btn">
+            Send
+          </button>
+        </form>
       </div>
 
       <div className="header-status-group">

@@ -558,3 +558,149 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Header Interactive Command Bar (Matches Picture) */
+.header-command-container {
+  flex: 1;
+  max-width: 480px;
+  margin: 0 16px;
+}
+
+.header-command-bar {
+  display: flex;
+  align-items: center;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(56, 189, 248, 0.35);
+  border-radius: 9999px;
+  padding: 4px 6px 4px 12px;
+  backdrop-filter: blur(14px);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  transition: all 0.25s ease;
+}
+
+.header-command-bar:focus-within {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25), 0 6px 24px rgba(0, 0, 0, 0.5);
+}
+
+.command-mic-btn {
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 6px;
+  border-radius: 50%;
+  transition: all 0.2s ease;
+}
+
+.command-mic-btn:hover {
+  color: #38bdf8;
+  background: rgba(56, 189, 248, 0.15);
+}
+
+.command-mic-btn.listening {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.25);
+  animation: pulse 1.5s infinite;
+}
+
+.command-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #f8fafc;
+  font-size: 13.5px;
+  font-family: inherit;
+  padding: 4px 10px;
+}
+
+.command-input::placeholder {
+  color: #64748b;
+  font-style: italic;
+}
+
+.command-send-btn {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 9999px;
+  padding: 6px 18px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.4);
+}
+
+.command-send-btn:hover {
+  background: #1d4ed8;
+  box-shadow: 0 4px 14px rgba(37, 99, 235, 0.55);
+  transform: translateY(-1px);
+}
+
+.command-send-btn:active {
+  transform: translateY(0);
+}
+
+/* Directional Drive D-Pad Controls */
+.directional-drive-cluster {
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(51, 65, 85, 0.5);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dpad-header {
+  font-size: 11px;
+  color: var(--slate-400);
+  font-weight: 500;
+}
+
+.dpad-layout {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.dpad-row {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+  max-width: 240px;
+}
+
+.dpad-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #e2e8f0;
+  font-size: 12px;
+  font-weight: 500;
+  padding: 6px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex: 1;
+}
+
+.dpad-btn:hover {
+  background: rgba(56, 189, 248, 0.15);
+  border-color: #38bdf8;
+  color: #38bdf8;
+}
+
+.dpad-btn:active {
+  transform: scale(0.97);
+}
+

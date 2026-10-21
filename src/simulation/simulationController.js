@@ -263,6 +263,224 @@ export class SimulationController {
     }
   }
 
+  // Directional Manual Commands for Simulated Robot
+  moveForward(steps = 1) {
+    if (this.movementTimer) {
+      clearInterval(this.movementTimer);
+      this.movementTimer = null;
+    }
+    const headingRad = (this.state.robotPosition.heading || 0) * (Math.PI / 180);
+    const dx = Math.round(Math.sin(headingRad)) * steps;
+    const dy = Math.round(-Math.cos(headingRad)) * steps;
+
+    const nextGridX = Math.min(19, Math.max(1, this.state.robotPosition.grid.x + dx));
+    const nextGridY = Math.min(19, Math.max(1, this.state.robotPosition.grid.y + dy));
+
+    // Collision detection with obstacles
+    const isBlocked = this.state.obstacles.some(
+      obs => Math.hypot(obs.grid.x - nextGridX, obs.grid.y - nextGridY) < 1.3
+    );
+
+    if (isBlocked) {
+      this.setState({
+        status: 'avoiding_obstacle',
+        isObstacleDetected: true
+      });
+      return false;
+    }
+
+    const startPt = { ...this.state.robotPosition.grid };
+    const targetPt = { x: nextGridX, y: nextGridY };
+    const miniRoute = [{ grid: startPt }, { grid: targetPt }];
+
+    this.cumulativeDistance += 1.2 * steps;
+
+    this.setState({
+      status: 'moving',
+      activeRoute: miniRoute,
+      robotPosition: {
+        grid: targetPt,
+        world: { x: targetPt.x - 10, y: 0, z: targetPt.y - 10 },
+        heading: this.state.robotPosition.heading
+      },
+      stats: {
+        ...this.state.stats,
+        distanceTraveled: this.cumulativeDistance.toFixed(1)
+      }
+    });
+
+    setTimeout(() => {
+      if (this.state.status === 'moving' && !this.movementTimer) {
+        this.setState({ status: 'idle', activeRoute: [] });
+      }
+    }, 600);
+
+    return true;
+  }
+
+  moveBackward(steps = 1) {
+    if (this.movementTimer) {
+      clearInterval(this.movementTimer);
+      this.movementTimer = null;
+    }
+    const headingRad = (this.state.robotPosition.heading || 0) * (Math.PI / 180);
+    const dx = -Math.round(Math.sin(headingRad)) * steps;
+    const dy = Math.round(Math.cos(headingRad)) * steps;
+
+    const nextGridX = Math.min(19, Math.max(1, this.state.robotPosition.grid.x + dx));
+    const nextGridY = Math.min(19, Math.max(1, this.state.robotPosition.grid.y + dy));
+
+    const isBlocked = this.state.obstacles.some(
+      obs => Math.hypot(obs.grid.x - nextGridX, obs.grid.y - nextGridY) < 1.3
+    );
+
+    if (isBlocked) {
+      this.setState({
+        status: 'avoiding_obstacle',
+        isObstacleDetected: true
+      });
+      return false;
+    }
+
+    const startPt = { ...this.state.robotPosition.grid };
+    const targetPt = { x: nextGridX, y: nextGridY };
+    const miniRoute = [{ grid: startPt }, { grid: targetPt }];
+
+    this.cumulativeDistance += 1.2 * steps;
+
+    this.setState({
+      status: 'moving',
+      activeRoute: miniRoute,
+      robotPosition: {
+        grid: targetPt,
+        world: { x: targetPt.x - 10, y: 0, z: targetPt.y - 10 },
+        heading: this.state.robotPosition.heading
+      },
+      stats: {
+        ...this.state.stats,
+        distanceTraveled: this.cumulativeDistance.toFixed(1)
+      }
+    });
+
+    setTimeout(() => {
+      if (this.state.status === 'moving' && !this.movementTimer) {
+        this.setState({ status: 'idle', activeRoute: [] });
+      }
+    }, 600);
+
+    return true;
+  }
+
+  turnLeft() {
+    const newHeading = (this.state.robotPosition.heading - 90 + 360) % 360;
+    this.setState({
+      robotPosition: {
+        ...this.state.robotPosition,
+        heading: newHeading
+      }
+    });
+    return true;
+  }
+
+  turnRight() {
+    const newHeading = (this.state.robotPosition.heading + 90) % 360;
+    this.setState({
+      robotPosition: {
+        ...this.state.robotPosition,
+        heading: newHeading
+      }
+    });
+    return true;
+  }
+
+  // Universal Command Interpreter & Executor
+  executeCommand(commandInput) {
+    if (!commandInput) return { success: false, message: 'Empty command' };
+
+    let cmdType = '';
+    let targetDest = null;
+
+    if (typeof commandInput === 'object') {
+      cmdType = commandInput.type;
+      targetDest = commandInput.destinationId;
+    } else {
+      const clean = String(commandInput).toLowerCase().trim();
+
+      if (clean.includes('library')) {
+        cmdType = 'NAVIGATE_TO';
+        targetDest = 'library';
+      } else if (clean.includes('classroom') || clean.includes('class')) {
+        cmdType = 'NAVIGATE_TO';
+        targetDest = 'classroom';
+      } else if (clean.includes('cafeteria') || clean.includes('cafe') || clean.includes('canteen')) {
+        cmdType = 'NAVIGATE_TO';
+        targetDest = 'cafeteria';
+      } else if (clean.includes('main gate') || clean.includes('gate') || clean.includes('entrance')) {
+        cmdType = 'NAVIGATE_TO';
+        targetDest = 'main_gate';
+      } else if (clean.includes('forward') || clean.includes('straight') || clean.includes('ahead')) {
+        cmdType = 'MOVE_FORWARD';
+      } else if (clean.includes('backward') || clean.includes('reverse') || clean.includes('back')) {
+        cmdType = 'MOVE_BACKWARD';
+      } else if (clean.includes('turn left') || clean.includes('left')) {
+        cmdType = 'TURN_LEFT';
+      } else if (clean.includes('turn right') || clean.includes('right')) {
+        cmdType = 'TURN_RIGHT';
+      } else if (clean.includes('pause') || clean.includes('stop') || clean.includes('halt')) {
+        cmdType = 'PAUSE_NAVIGATION';
+      } else if (clean.includes('resume') || clean.includes('continue') || clean.includes('go')) {
+        cmdType = 'RESUME_NAVIGATION';
+      } else if (clean.includes('reset') || clean.includes('restart') || clean.includes('dock')) {
+        cmdType = 'RESET_SIMULATION';
+      } else if (clean.includes('clear') || clean.includes('remove obstacle')) {
+        cmdType = 'REMOVE_OBSTACLE';
+      } else if (clean.includes('obstacle') || clean.includes('hazard')) {
+        cmdType = 'ADD_OBSTACLE';
+      } else {
+        cmdType = 'UNKNOWN';
+      }
+    }
+
+    switch (cmdType) {
+      case 'NAVIGATE_TO':
+      case 'SELECT_DESTINATION': {
+        const dest = this.selectDestination(targetDest);
+        if (dest) {
+          this.startNavigation(targetDest);
+          return { success: true, message: `Navigating to ${dest.name}` };
+        }
+        return { success: false, message: 'Destination not found' };
+      }
+      case 'START_NAVIGATION':
+        return { success: this.startNavigation(), message: 'Navigation started' };
+      case 'MOVE_FORWARD':
+        return { success: this.moveForward(1), message: 'Moving forward' };
+      case 'MOVE_BACKWARD':
+        return { success: this.moveBackward(1), message: 'Moving backward' };
+      case 'TURN_LEFT':
+        return { success: this.turnLeft(), message: 'Turned left' };
+      case 'TURN_RIGHT':
+        return { success: this.turnRight(), message: 'Turned right' };
+      case 'PAUSE_NAVIGATION':
+        this.pauseNavigation();
+        return { success: true, message: 'Navigation paused' };
+      case 'RESUME_NAVIGATION':
+        this.resumeNavigation();
+        return { success: true, message: 'Navigation resumed' };
+      case 'RESET_SIMULATION':
+        this.resetSimulation();
+        return { success: true, message: 'Reset to origin dock' };
+      case 'ADD_OBSTACLE':
+        this.addObstacle();
+        return { success: true, message: 'Obstacle placed' };
+      case 'REMOVE_OBSTACLE':
+        this.clearObstacles();
+        return { success: true, message: 'Obstacles cleared' };
+      default:
+        return { success: false, message: `Unknown command: ${commandInput}` };
+    }
+  }
+
   addObstacle(position = null) {
     const currentDest = this.state.currentDestination;
     const targetX = currentDest ? currentDest.gridPos.x : 16;
