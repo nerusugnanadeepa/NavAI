@@ -28,17 +28,27 @@ export function AppHeader({
   onSelectLanguage
 }) {
   const uiTexts = LANGUAGE_UI_TEXTS[currentLanguage] || LANGUAGE_UI_TEXTS.en;
-  const [commandText, setCommandText] = useState(uiTexts.quickPhrases[0] || 'Go to the library');
+  const [commandText, setCommandText] = useState('');
 
-  useEffect(() => {
-    const texts = LANGUAGE_UI_TEXTS[currentLanguage] || LANGUAGE_UI_TEXTS.en;
-    setCommandText(texts.quickPhrases[0] || 'Go to the library');
-  }, [currentLanguage]);
+  const destinationList = [
+    { id: 'library', name: uiTexts.destinationLabels?.library || 'Library', icon: '📚' },
+    { id: 'cafeteria', name: uiTexts.destinationLabels?.cafeteria || 'Cafeteria', icon: '☕' },
+    { id: 'classroom', name: uiTexts.destinationLabels?.classroom || 'Classroom', icon: '🎓' },
+    { id: 'main_gate', name: uiTexts.destinationLabels?.main_gate || 'Main Gate', icon: '🚪' }
+  ];
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (commandText.trim() && onExecuteCommand) {
-      onExecuteCommand(commandText.trim());
+    const query = commandText.trim() || uiTexts.quickPhrases[0];
+    if (query && onExecuteCommand) {
+      onExecuteCommand(query);
+      setCommandText('');
+    }
+  };
+
+  const handleChipClick = (destName) => {
+    if (onExecuteCommand) {
+      onExecuteCommand(destName);
     }
   };
 
@@ -75,7 +85,7 @@ export function AppHeader({
         </div>
       </div>
  
-      {/* Center Interactive Command Bar (Matches Picture!) */}
+      {/* Center Interactive Command Bar (Supports ANY Destination in ANY Language) */}
       <div className="header-command-container">
         <form className="header-command-bar" onSubmit={handleSubmit}>
           <button
@@ -97,6 +107,22 @@ export function AppHeader({
             {uiTexts.sendBtn}
           </button>
         </form>
+
+        {/* Quick Destination Shortcut Pills */}
+        <div className="header-destination-chips">
+          {destinationList.map((d) => (
+            <button
+              key={d.id}
+              type="button"
+              className="header-chip-btn"
+              onClick={() => handleChipClick(d.name)}
+              title={`Go to ${d.name}`}
+            >
+              <span className="header-chip-icon">{d.icon}</span>
+              <span>{d.name}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="header-status-group">

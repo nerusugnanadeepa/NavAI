@@ -143,7 +143,8 @@ export function App() {
   const handleSelectDestination = (destId) => {
     const dest = selectDestination(destId);
     if (dest) {
-      addLogEvent(`Destination selected: ${dest.name} (${dest.category}).`, 'nav');
+      addLogEvent(`Human command: Navigating to ${dest.name} (${dest.category}).`, 'nav');
+      startNavigation(destId);
     }
   };
 
@@ -307,6 +308,7 @@ export function App() {
             currentDestination={currentDestination}
             onSelect={handleSelectDestination}
             disabled={status === 'moving' || status === 'avoiding_obstacle'}
+            currentLanguage={currentLanguage}
           />
 
           <VoiceAssistant 

@@ -95,11 +95,21 @@ export class SpeechInputEngine {
 
   parseCommand(text) {
     if (!text) return { type: 'UNKNOWN', raw: '' };
-    const clean = text.toLowerCase().trim();
 
-    // 1. Destination Navigation Commands (multilingual)
+    // Normalize text: lowercase, strip zero-width characters and punctuation
+    const clean = text
+      .toLowerCase()
+      .replace(/[\u200B-\u200D\uFEFF]/g, '')
+      .replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    // 1. Destination Navigation Commands (multilingual for Library, Cafeteria, Classroom, Main Gate)
     for (const [destId, keywords] of Object.entries(MULTILINGUAL_DICTIONARY.destinations)) {
-      if (keywords.some(k => clean.includes(k.toLowerCase()))) {
+      if (keywords.some(k => {
+        const normK = k.toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+        return clean.includes(normK);
+      })) {
         const destNames = {
           library: 'Library',
           classroom: 'Classroom Block',
@@ -108,6 +118,24 @@ export class SpeechInputEngine {
         };
         return { type: 'NAVIGATE_TO', destinationId: destId, name: destNames[destId] };
       }
+    }
+
+    // Extract optional step count for directional movement (e.g. "forward 2", "ముందుకు 3")
+    let steps = 1;
+    const digitMatch = clean.match(/(\d+)/);
+    if (digitMatch) {
+      const n = parseInt(digitMatch[1], 10);
+      if (n > 0 && n <= 10) steps = n;
+    } else if (clean.includes('one') || clean.includes('ఒక') || clean.includes('एक') || clean.includes('ഒന്ന്') || clean.includes('ஒன்று') || clean.includes('ಒಂದು')) {
+      steps = 1;
+    } else if (clean.includes('two') || clean.includes('రెండు') || clean.includes('दो') || clean.includes('രണ്ട്') || clean.includes('இரண்டு') || clean.includes('ಎರಡು')) {
+      steps = 2;
+    } else if (clean.includes('three') || clean.includes('మూడు') || clean.includes('तीन') || clean.includes('മൂന്ന്') || clean.includes('மூன்று') || clean.includes('ಮೂರು')) {
+      steps = 3;
+    } else if (clean.includes('four') || clean.includes('నాలుగు') || clean.includes('चार') || clean.includes('നാല്') || clean.includes('நான்கு') || clean.includes('ನಾಲ್ಕು')) {
+      steps = 4;
+    } else if (clean.includes('five') || clean.includes('ఐదు') || clean.includes('पाँच') || clean.includes('അഞ്ച്') || clean.includes('ஐந்து') || clean.includes('ಐದು')) {
+      steps = 5;
     }
 
     // 2. Clear / Remove Obstacles (multilingual)
@@ -122,10 +150,10 @@ export class SpeechInputEngine {
 
     // 4. Directional Movements (multilingual)
     if (MULTILINGUAL_DICTIONARY.movements.forward.some(k => clean.includes(k.toLowerCase()))) {
-      return { type: 'MOVE_FORWARD' };
+      return { type: 'MOVE_FORWARD', steps };
     }
     if (MULTILINGUAL_DICTIONARY.movements.backward.some(k => clean.includes(k.toLowerCase()))) {
-      return { type: 'MOVE_BACKWARD' };
+      return { type: 'MOVE_BACKWARD', steps };
     }
     if (MULTILINGUAL_DICTIONARY.movements.turnLeft.some(k => clean.includes(k.toLowerCase()))) {
       return { type: 'TURN_LEFT' };

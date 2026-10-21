@@ -8,6 +8,7 @@ import {
   Navigation
 } from 'lucide-react';
 import { DESTINATIONS } from '../simulation/simulationController';
+import { LANGUAGE_UI_TEXTS } from '../voice/languages';
 
 const ICON_MAP = {
   library: BookOpen,
@@ -16,7 +17,9 @@ const ICON_MAP = {
   main_gate: DoorOpen
 };
 
-export function DestinationSelector({ currentDestination, onSelect, disabled }) {
+export function DestinationSelector({ currentDestination, onSelect, disabled, currentLanguage = 'en' }) {
+  const uiTexts = LANGUAGE_UI_TEXTS[currentLanguage] || LANGUAGE_UI_TEXTS.en;
+
   return (
     <div className="glass-panel">
       <div className="card-header">
@@ -26,7 +29,7 @@ export function DestinationSelector({ currentDestination, onSelect, disabled }) 
         </h2>
         {currentDestination && (
           <span className="badge badge-planning">
-            Target: {currentDestination.name}
+            Target: {uiTexts.destinationLabels?.[currentDestination.id] || currentDestination.name}
           </span>
         )}
       </div>
@@ -36,6 +39,7 @@ export function DestinationSelector({ currentDestination, onSelect, disabled }) 
           {DESTINATIONS.map((dest) => {
             const Icon = ICON_MAP[dest.id] || Navigation;
             const isSelected = currentDestination?.id === dest.id;
+            const localizedName = uiTexts.destinationLabels?.[dest.id] || dest.name;
 
             return (
               <button
@@ -54,7 +58,7 @@ export function DestinationSelector({ currentDestination, onSelect, disabled }) 
                     {dest.estimatedDist}
                   </span>
                 </div>
-                <div className="destination-name">{dest.name}</div>
+                <div className="destination-name">{localizedName}</div>
                 <div className="destination-meta">{dest.category}</div>
               </button>
             );

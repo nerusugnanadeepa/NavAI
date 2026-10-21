@@ -3,6 +3,8 @@
  * Shared Interface Contract between Agent 1 (UI/Voice) and Agent 2 (Simulation/Pathfinding)
  */
 
+import { speechInput } from '../voice/speechInput';
+
 export const DESTINATIONS = [
   {
     id: 'library',
@@ -393,52 +395,23 @@ export class SimulationController {
     return true;
   }
 
-  // Universal Command Interpreter & Executor
+  // Universal Multilingual Command Interpreter & Executor
   executeCommand(commandInput) {
     if (!commandInput) return { success: false, message: 'Empty command' };
 
     let cmdType = '';
     let targetDest = null;
+    let steps = 1;
 
     if (typeof commandInput === 'object') {
       cmdType = commandInput.type;
       targetDest = commandInput.destinationId;
+      steps = commandInput.steps || 1;
     } else {
-      const clean = String(commandInput).toLowerCase().trim();
-
-      if (clean.includes('library')) {
-        cmdType = 'NAVIGATE_TO';
-        targetDest = 'library';
-      } else if (clean.includes('classroom') || clean.includes('class')) {
-        cmdType = 'NAVIGATE_TO';
-        targetDest = 'classroom';
-      } else if (clean.includes('cafeteria') || clean.includes('cafe') || clean.includes('canteen')) {
-        cmdType = 'NAVIGATE_TO';
-        targetDest = 'cafeteria';
-      } else if (clean.includes('main gate') || clean.includes('gate') || clean.includes('entrance')) {
-        cmdType = 'NAVIGATE_TO';
-        targetDest = 'main_gate';
-      } else if (clean.includes('forward') || clean.includes('straight') || clean.includes('ahead')) {
-        cmdType = 'MOVE_FORWARD';
-      } else if (clean.includes('backward') || clean.includes('reverse') || clean.includes('back')) {
-        cmdType = 'MOVE_BACKWARD';
-      } else if (clean.includes('turn left') || clean.includes('left')) {
-        cmdType = 'TURN_LEFT';
-      } else if (clean.includes('turn right') || clean.includes('right')) {
-        cmdType = 'TURN_RIGHT';
-      } else if (clean.includes('pause') || clean.includes('stop') || clean.includes('halt')) {
-        cmdType = 'PAUSE_NAVIGATION';
-      } else if (clean.includes('resume') || clean.includes('continue') || clean.includes('go')) {
-        cmdType = 'RESUME_NAVIGATION';
-      } else if (clean.includes('reset') || clean.includes('restart') || clean.includes('dock')) {
-        cmdType = 'RESET_SIMULATION';
-      } else if (clean.includes('clear') || clean.includes('remove obstacle')) {
-        cmdType = 'REMOVE_OBSTACLE';
-      } else if (clean.includes('obstacle') || clean.includes('hazard')) {
-        cmdType = 'ADD_OBSTACLE';
-      } else {
-        cmdType = 'UNKNOWN';
-      }
+      const parsed = speechInput.parseCommand(commandInput);
+      cmdType = parsed.type;
+      targetDest = parsed.destinationId;
+      steps = parsed.steps || 1;
     }
 
     switch (cmdType) {
