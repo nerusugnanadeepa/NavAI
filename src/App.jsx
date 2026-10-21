@@ -33,6 +33,7 @@ import {
 import { useSimulation } from './hooks/useSimulation';
 import { speechOutput } from './voice/speechOutput';
 import { speechInput } from './voice/speechInput';
+import { SUPPORTED_LANGUAGES } from './voice/languages';
 import './App.css';
 
 export function App() {
@@ -62,6 +63,7 @@ export function App() {
     executeCommand
   } = useSimulation();
 
+  const [currentLanguage, setCurrentLanguage] = useState('en');
   const [isMuted, setIsMuted] = useState(false);
   const [isListening, setIsListening] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -270,9 +272,17 @@ export function App() {
     }
   };
 
+  const handleSelectLanguage = (langCode) => {
+    setCurrentLanguage(langCode);
+    speechInput.setLanguage(langCode);
+    speechOutput.setLanguage(langCode);
+    const langObj = SUPPORTED_LANGUAGES.find(l => l.code === langCode);
+    addLogEvent(`System language set to ${langObj?.name || langCode} (${langObj?.native || ''}).`, 'system');
+  };
+
   return (
     <div className="app-container">
-      {/* Header with Command Bar */}
+      {/* Header with Command Bar & Language Selector */}
       <AppHeader
         status={status}
         isMuted={isMuted}
@@ -285,6 +295,8 @@ export function App() {
         }}
         isListening={isListening}
         onToggleVoice={handleToggleHeaderVoice}
+        currentLanguage={currentLanguage}
+        onSelectLanguage={handleSelectLanguage}
       />
 
       {/* Main Responsive Grid Layout */}
@@ -298,7 +310,8 @@ export function App() {
           />
 
           <VoiceAssistant 
-            onCommandRecognized={handleVoiceCommand} 
+            onCommandRecognized={handleVoiceCommand}
+            currentLanguage={currentLanguage}
           />
         </div>
 

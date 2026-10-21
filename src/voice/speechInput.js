@@ -1,7 +1,4 @@
-/**
- * NaviAI Voice Recognition Engine (Speech Input)
- * Uses browser SpeechRecognition or webkitSpeechRecognition
- */
+import { SUPPORTED_LANGUAGES, MULTILINGUAL_DICTIONARY } from './languages';
 
 export class SpeechInputEngine {
   constructor() {
@@ -11,6 +8,7 @@ export class SpeechInputEngine {
 
     this.recognition = SpeechRecognition ? new SpeechRecognition() : null;
     this.isListening = false;
+    this.currentLang = 'en';
     this.onResultCallback = null;
     this.onStateChangeCallback = null;
     this.onErrorCallback = null;
@@ -52,6 +50,14 @@ export class SpeechInputEngine {
     return Boolean(this.recognition);
   }
 
+  setLanguage(langCode) {
+    this.currentLang = langCode;
+    const langObj = SUPPORTED_LANGUAGES.find(l => l.code === langCode);
+    if (this.recognition && langObj) {
+      this.recognition.lang = langObj.langTag;
+    }
+  }
+
   notifyState(state, detail = null) {
     if (this.onStateChangeCallback) {
       this.onStateChangeCallback({ state, detail });
@@ -88,74 +94,66 @@ export class SpeechInputEngine {
   }
 
   parseCommand(text) {
+    if (!text) return { type: 'UNKNOWN', raw: '' };
     const clean = text.toLowerCase().trim();
 
-    // Check Destination navigation commands (immediate move to destination)
-    if (clean.includes('library')) {
-      return { type: 'NAVIGATE_TO', destinationId: 'library', name: 'Library' };
-    }
-    if (clean.includes('classroom') || clean.includes('class')) {
-      return { type: 'NAVIGATE_TO', destinationId: 'classroom', name: 'Classroom Block' };
-    }
-    if (clean.includes('cafeteria') || clean.includes('cafe') || clean.includes('canteen')) {
-      return { type: 'NAVIGATE_TO', destinationId: 'cafeteria', name: 'Cafeteria' };
-    }
-    if (clean.includes('main gate') || clean.includes('gate') || clean.includes('entrance')) {
-      return { type: 'NAVIGATE_TO', destinationId: 'main_gate', name: 'Main Gate' };
+    // 1. Destination Navigation Commands (multilingual)
+    for (const [destId, keywords] of Object.entries(MULTILINGUAL_DICTIONARY.destinations)) {
+      if (keywords.some(k => clean.includes(k.toLowerCase()))) {
+        const destNames = {
+          library: 'Library',
+          classroom: 'Classroom Block',
+          cafeteria: 'Cafeteria',
+          main_gate: 'Main Gate'
+        };
+        return { type: 'NAVIGATE_TO', destinationId: destId, name: destNames[destId] };
+      }
     }
 
-    // Directional robot movement commands
-    if (clean.includes('forward') || clean.includes('straight') || clean.includes('ahead')) {
+    // 2. Clear / Remove Obstacles (multilingual)
+    if (MULTILINGUAL_DICTIONARY.controls.clearObstacles.some(k => clean.includes(k.toLowerCase()))) {
+      return { type: 'REMOVE_OBSTACLE' };
+    }
+
+    // 3. Add Obstacle (multilingual)
+    if (MULTILINGUAL_DICTIONARY.controls.addObstacle.some(k => clean.includes(k.toLowerCase()))) {
+      return { type: 'ADD_OBSTACLE' };
+    }
+
+    // 4. Directional Movements (multilingual)
+    if (MULTILINGUAL_DICTIONARY.movements.forward.some(k => clean.includes(k.toLowerCase()))) {
       return { type: 'MOVE_FORWARD' };
     }
-    if (clean.includes('backward') || clean.includes('reverse') || clean.includes('back')) {
+    if (MULTILINGUAL_DICTIONARY.movements.backward.some(k => clean.includes(k.toLowerCase()))) {
       return { type: 'MOVE_BACKWARD' };
     }
-    if (clean.includes('turn left') || clean.includes('left')) {
+    if (MULTILINGUAL_DICTIONARY.movements.turnLeft.some(k => clean.includes(k.toLowerCase()))) {
       return { type: 'TURN_LEFT' };
     }
-    if (clean.includes('turn right') || clean.includes('right')) {
+    if (MULTILINGUAL_DICTIONARY.movements.turnRight.some(k => clean.includes(k.toLowerCase()))) {
       return { type: 'TURN_RIGHT' };
     }
 
-    // Speed adjustments
-    if (clean.includes('faster') || clean.includes('speed up')) {
+    // 5. Speed Adjustments (multilingual)
+    if (MULTILINGUAL_DICTIONARY.controls.speedUp.some(k => clean.includes(k.toLowerCase()))) {
       return { type: 'SPEED_UP' };
     }
-    if (clean.includes('slower') || clean.includes('slow down')) {
+    if (MULTILINGUAL_DICTIONARY.controls.slowDown.some(k => clean.includes(k.toLowerCase()))) {
       return { type: 'SLOW_DOWN' };
     }
 
-    // Check Navigation Control commands
-    if (clean.includes('start') || clean.includes('navigate') || clean.includes('go')) {
-      return { type: 'START_NAVIGATION' };
-    }
-    if (clean.includes('pause') || clean.includes('hold') || clean.includes('stop') || clean.includes('halt')) {
+    // 6. Navigation Control Commands (multilingual)
+    if (MULTILINGUAL_DICTIONARY.controls.pause.some(k => clean.includes(k.toLowerCase()))) {
       return { type: 'PAUSE_NAVIGATION' };
     }
-    if (clean.includes('resume') || clean.includes('continue')) {
+    if (MULTILINGUAL_DICTIONARY.controls.resume.some(k => clean.includes(k.toLowerCase()))) {
       return { type: 'RESUME_NAVIGATION' };
     }
-    if (clean.includes('reset') || clean.includes('restart') || clean.includes('origin') || clean.includes('dock')) {
+    if (MULTILINGUAL_DICTIONARY.controls.reset.some(k => clean.includes(k.toLowerCase()))) {
       return { type: 'RESET_SIMULATION' };
     }
-    // Prioritize removal commands first
-    if (
-      clean.includes('remove obstacle') || 
-      clean.includes('clear obstacle') || 
-      clean.includes('clear obstacles') || 
-      clean.includes('delete obstacle')
-    ) {
-      return { type: 'REMOVE_OBSTACLE' };
-    }
-    // Then check obstacle injection commands
-    if (
-      clean.includes('add obstacle') || 
-      clean.includes('block') || 
-      clean.includes('hazard') || 
-      clean.includes('obstacle')
-    ) {
-      return { type: 'ADD_OBSTACLE' };
+    if (MULTILINGUAL_DICTIONARY.controls.start.some(k => clean.includes(k.toLowerCase()))) {
+      return { type: 'START_NAVIGATION' };
     }
 
     return { type: 'UNKNOWN', raw: text };

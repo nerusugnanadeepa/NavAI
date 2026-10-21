@@ -646,6 +646,58 @@
   transform: translateY(0);
 }
 
+/* Header Multilingual Selector (Matches Reference UI) */
+.header-lang-selector-wrapper {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(30, 41, 59, 0.7);
+  border: 1px solid rgba(56, 189, 248, 0.3);
+  padding: 5px 24px 5px 10px;
+  border-radius: var(--radius-full);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.header-lang-selector-wrapper:hover {
+  border-color: #38bdf8;
+  background: rgba(30, 41, 59, 0.95);
+  box-shadow: 0 0 12px rgba(56, 189, 248, 0.25);
+}
+
+.header-lang-select {
+  background: transparent;
+  border: none;
+  color: #f8fafc;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.header-lang-select option {
+  background: #0f172a;
+  color: #f8fafc;
+  padding: 6px;
+}
+
+.header-lang-arrow {
+  position: absolute;
+  right: 8px;
+  pointer-events: none;
+  color: #94a3b8;
+  transition: transform 0.2s ease;
+}
+
+.header-lang-selector-wrapper:hover .header-lang-arrow {
+  color: #38bdf8;
+}
+
 /* Directional Drive D-Pad Controls */
 .directional-drive-cluster {
   background: rgba(15, 23, 42, 0.6);

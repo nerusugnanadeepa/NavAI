@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   Bot, 
   Volume2, 
@@ -9,9 +9,11 @@ import {
   Radio, 
   ShieldAlert,
   HelpCircle,
-  Mic
+  Mic,
+  Globe,
+  ChevronDown
 } from 'lucide-react';
-import { speechOutput } from '../voice/speechOutput';
+import { SUPPORTED_LANGUAGES, LANGUAGE_UI_TEXTS } from '../voice/languages';
 
 export function AppHeader({ 
   status, 
@@ -21,9 +23,17 @@ export function AppHeader({
   stats,
   onExecuteCommand,
   isListening,
-  onToggleVoice
+  onToggleVoice,
+  currentLanguage = 'en',
+  onSelectLanguage
 }) {
-  const [commandText, setCommandText] = useState('Go to the library');
+  const uiTexts = LANGUAGE_UI_TEXTS[currentLanguage] || LANGUAGE_UI_TEXTS.en;
+  const [commandText, setCommandText] = useState(uiTexts.quickPhrases[0] || 'Go to the library');
+
+  useEffect(() => {
+    const texts = LANGUAGE_UI_TEXTS[currentLanguage] || LANGUAGE_UI_TEXTS.en;
+    setCommandText(texts.quickPhrases[0] || 'Go to the library');
+  }, [currentLanguage]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -81,10 +91,10 @@ export function AppHeader({
             className="command-input"
             value={commandText}
             onChange={(e) => setCommandText(e.target.value)}
-            placeholder="'Go to the library' or 'move forward', 'turn left'"
+            placeholder={uiTexts.commandPlaceholder}
           />
           <button type="submit" className="command-send-btn">
-            Send
+            {uiTexts.sendBtn}
           </button>
         </form>
       </div>
@@ -100,6 +110,23 @@ export function AppHeader({
         <div className="system-stat-pill" title="Virtual Robot Battery">
           <Battery size={14} color="#10B981" />
           <span>Power: <strong>{stats?.batteryPercent ?? 94}%</strong></span>
+        </div>
+
+        {/* Language Selector Dropdown (Matches Reference Picture!) */}
+        <div className="header-lang-selector-wrapper" title="Select Voice & Command Language">
+          <Globe size={14} color="#06B6D4" />
+          <select 
+            className="header-lang-select"
+            value={currentLanguage}
+            onChange={(e) => onSelectLanguage && onSelectLanguage(e.target.value)}
+          >
+            {SUPPORTED_LANGUAGES.map((lang) => (
+              <option key={lang.code} value={lang.code}>
+                {lang.native} ({lang.name})
+              </option>
+            ))}
+          </select>
+          <ChevronDown size={12} className="header-lang-arrow" />
         </div>
 
         <button 

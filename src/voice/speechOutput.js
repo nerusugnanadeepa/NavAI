@@ -1,12 +1,10 @@
-/**
- * NaviAI Voice Guidance Engine (Speech Output)
- * Uses the Web Speech API (window.speechSynthesis)
- */
+import { SUPPORTED_LANGUAGES, LANGUAGE_UI_TEXTS } from './languages';
 
 class SpeechOutputEngine {
   constructor() {
     this.synth = typeof window !== 'undefined' ? window.speechSynthesis : null;
     this.isMuted = false;
+    this.currentLang = 'en';
     this.voice = null;
     this.rate = 1.0;
     this.pitch = 1.0;
@@ -19,13 +17,24 @@ class SpeechOutputEngine {
     }
   }
 
+  setLanguage(langCode) {
+    this.currentLang = langCode;
+    this.initVoice();
+  }
+
   initVoice() {
     if (!this.synth) return;
     const voices = this.synth.getVoices();
-    // Prefer clear English neural/natural voices if available
-    const preferredVoice = voices.find(
-      v => (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Neural')) && v.lang.startsWith('en')
-    ) || voices.find(v => v.lang.startsWith('en')) || voices[0];
+    const langObj = SUPPORTED_LANGUAGES.find(l => l.code === this.currentLang) || SUPPORTED_LANGUAGES[0];
+    const prefix = langObj.code;
+    const fullTag = langObj.langTag;
+
+    const preferredVoice = voices.find(v => v.lang === fullTag)
+      || voices.find(v => v.lang.startsWith(prefix))
+      || voices.find(v => (v.name.includes('Natural') || v.name.includes('Google') || v.name.includes('Neural')) && v.lang.startsWith('en'))
+      || voices.find(v => v.lang.startsWith('en'))
+      || voices[0];
+
     this.voice = preferredVoice || null;
   }
 
@@ -44,6 +53,10 @@ class SpeechOutputEngine {
     return this.isMuted;
   }
 
+  getTexts() {
+    return LANGUAGE_UI_TEXTS[this.currentLang] || LANGUAGE_UI_TEXTS.en;
+  }
+
   speak(text, priority = false) {
     if (!this.synth || this.isMuted || !text) return;
 
@@ -54,6 +67,8 @@ class SpeechOutputEngine {
 
       const utterance = new SpeechSynthesisUtterance(text);
       if (this.voice) utterance.voice = this.voice;
+      const langObj = SUPPORTED_LANGUAGES.find(l => l.code === this.currentLang);
+      if (langObj) utterance.lang = langObj.langTag;
       utterance.rate = this.rate;
       utterance.pitch = this.pitch;
 
@@ -63,37 +78,45 @@ class SpeechOutputEngine {
     }
   }
 
-  // Pre-configured voice announcements
+  // Multilingual voice announcements
   speakNavStarted(destinationName) {
-    this.speak(`Navigation initiated towards ${destinationName}. Calculating collision-free route.`, true);
+    const text = this.getTexts().speech.navStarted(destinationName);
+    this.speak(text, true);
   }
 
   speakObstacleDetected() {
-    this.speak('Caution: Obstacle detected on active route. Recalculating path.', true);
+    const text = this.getTexts().speech.obstacleDetected();
+    this.speak(text, true);
   }
 
   speakRouteRecalculated() {
-    this.speak('Alternative route calculated. Resuming autonomous navigation.', true);
+    const text = this.getTexts().speech.routeRecalculated();
+    this.speak(text, true);
   }
 
   speakDestinationReached(destinationName) {
-    this.speak(`Destination reached: ${destinationName}. Navigation completed successfully.`, true);
+    const text = this.getTexts().speech.destinationReached(destinationName);
+    this.speak(text, true);
   }
 
   speakNoRoute() {
-    this.speak('Alert: Path is blocked. No safe alternative route found in the simulation.', true);
+    const text = this.getTexts().speech.noRoute();
+    this.speak(text, true);
   }
 
   speakPaused() {
-    this.speak('Navigation paused.');
+    const text = this.getTexts().speech.paused();
+    this.speak(text);
   }
 
   speakResumed() {
-    this.speak('Navigation resumed.');
+    const text = this.getTexts().speech.resumed();
+    this.speak(text);
   }
 
   speakSimulationReset() {
-    this.speak('Simulation reset to origin dock.');
+    const text = this.getTexts().speech.reset();
+    this.speak(text);
   }
 }
 

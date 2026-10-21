@@ -9,8 +9,11 @@ import {
 } from 'lucide-react';
 import { speechInput } from '../voice/speechInput';
 import { speechOutput } from '../voice/speechOutput';
+import { SUPPORTED_LANGUAGES, LANGUAGE_UI_TEXTS } from '../voice/languages';
 
-export function VoiceAssistant({ onCommandRecognized }) {
+export function VoiceAssistant({ onCommandRecognized, currentLanguage = 'en' }) {
+  const uiTexts = LANGUAGE_UI_TEXTS[currentLanguage] || LANGUAGE_UI_TEXTS.en;
+  const currentLangObj = SUPPORTED_LANGUAGES.find(l => l.code === currentLanguage) || SUPPORTED_LANGUAGES[0];
   const [isListening, setIsListening] = useState(false);
   const [transcript, setTranscript] = useState('');
   const [lastCommand, setLastCommand] = useState(null);
@@ -69,7 +72,7 @@ export function VoiceAssistant({ onCommandRecognized }) {
           Voice AI Assistant
         </h2>
         <span className="badge badge-planning" style={{ background: 'rgba(168, 85, 247, 0.2)' }}>
-          Web Speech API
+          {currentLangObj.native} ({currentLangObj.langTag})
         </span>
       </div>
 
@@ -91,7 +94,7 @@ export function VoiceAssistant({ onCommandRecognized }) {
               {isListening ? 'Listening for voice command...' : 'Click mic to speak command'}
             </div>
             <div className="text-xs text-slate-400 font-mono mt-0.5">
-              {transcript || 'Say: "Go to Library", "Pause", "Reset"'}
+              {transcript || uiTexts.sampleVoice}
             </div>
           </div>
 
@@ -114,25 +117,14 @@ export function VoiceAssistant({ onCommandRecognized }) {
           </div>
         )}
 
-        {/* Quick click suggestions (Voice simulation/touch fallback) */}
+        {/* Quick click suggestions (Localized Voice simulation/touch fallback) */}
         <div>
           <div className="text-xs text-slate-400 mb-2 flex items-center gap-1">
             <HelpCircle size={12} />
-            <span>Try spoken or simulated voice commands:</span>
+            <span>Try spoken or simulated commands ({currentLangObj.native}):</span>
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {[
-              'Go to Library',
-              'Navigate to Cafeteria',
-              'Move Forward',
-              'Turn Left',
-              'Turn Right',
-              'Move Backward',
-              'Pause Navigation',
-              'Resume Navigation',
-              'Reset Simulation',
-              'Add Obstacle'
-            ].map((phrase) => (
+            {uiTexts.quickPhrases.map((phrase) => (
               <button
                 key={phrase}
                 type="button"
