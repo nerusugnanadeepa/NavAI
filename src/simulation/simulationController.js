@@ -82,19 +82,19 @@ export const INITIAL_ROUTE = [
 export class SimulationController {
   constructor() {
     this.state = {
-      status: 'avoiding_obstacle', // Matches reference picture active detour state
+      status: 'idle', // System ready and Start button enabled on page load!
       currentDestination: DESTINATIONS[0], // Library
       robotPosition: { ...INITIAL_ROBOT_POSITION },
       activeRoute: [...INITIAL_ROUTE],
-      progressPercent: 15,
+      progressPercent: 0,
       obstacles: [...INITIAL_OBSTACLES],
       speed: 1.0,
-      isObstacleDetected: true,
+      isObstacleDetected: false,
       blockedSegment: null,
       stats: {
         waypointsRemaining: INITIAL_ROUTE.length,
         totalWaypoints: INITIAL_ROUTE.length,
-        distanceTraveled: 1.2,
+        distanceTraveled: 0,
         speedMps: 0.8,
         batteryPercent: 94
       }
@@ -104,6 +104,7 @@ export class SimulationController {
     this.engineDelegate = null; // Agent 2 attaches here
     this.movementTimer = null;
     this.replanTimeout = null;
+    this.planningTimeout = null;
     this.currentWaypointIndex = 0;
     this.cumulativeDistance = 0;
   }
@@ -115,6 +116,12 @@ export class SimulationController {
       if (delegate.updateRobotPose) delegate.updateRobotPose(this.state.robotPosition);
       if (delegate.updateDestination) delegate.updateDestination(this.state.currentDestination);
       if (delegate.syncRoute) delegate.syncRoute(this.state.activeRoute, this.state.status);
+    }
+  }
+
+  detachEngine(delegate = null) {
+    if (!delegate || this.engineDelegate === delegate) {
+      this.engineDelegate = null;
     }
   }
 
@@ -231,12 +238,18 @@ export class SimulationController {
       isObstacleDetected: false
     });
 
+    if (this.planningTimeout) {
+      clearTimeout(this.planningTimeout);
+      this.planningTimeout = null;
+    }
+
     if (this.engineDelegate?.startNavigation) {
       return this.engineDelegate.startNavigation(dest.id);
     }
 
     // Agent 1 Built-in Navigation Loop
-    setTimeout(() => {
+    this.planningTimeout = setTimeout(() => {
+      this.planningTimeout = null;
       const route = this.generatePath(this.state.robotPosition.grid, dest.gridPos, this.state.obstacles);
       if (!route || route.length === 0) {
         this.setState({ status: 'no_route' });
@@ -261,6 +274,10 @@ export class SimulationController {
   }
 
   pauseNavigation() {
+    if (this.planningTimeout) {
+      clearTimeout(this.planningTimeout);
+      this.planningTimeout = null;
+    }
     if (this.movementTimer) {
       clearInterval(this.movementTimer);
       this.movementTimer = null;
@@ -288,7 +305,37 @@ export class SimulationController {
     }
   }
 
+  stopNavigation() {
+    if (this.planningTimeout) {
+      clearTimeout(this.planningTimeout);
+      this.planningTimeout = null;
+    }
+    if (this.movementTimer) {
+      clearInterval(this.movementTimer);
+      this.movementTimer = null;
+    }
+    if (this.replanTimeout) {
+      clearTimeout(this.replanTimeout);
+      this.replanTimeout = null;
+    }
+
+    this.currentWaypointIndex = 0;
+    this.setState({
+      status: 'idle',
+      activeRoute: [],
+      isObstacleDetected: false
+    });
+
+    if (this.engineDelegate?.stopNavigation) {
+      this.engineDelegate.stopNavigation();
+    }
+  }
+
   resetSimulation() {
+    if (this.planningTimeout) {
+      clearTimeout(this.planningTimeout);
+      this.planningTimeout = null;
+    }
     if (this.movementTimer) {
       clearInterval(this.movementTimer);
       this.movementTimer = null;
@@ -344,6 +391,12 @@ export class SimulationController {
         status: 'avoiding_obstacle',
         isObstacleDetected: true
       });
+      // Auto-recover after 2.5s so robot isn't trapped in avoiding_obstacle forever
+      setTimeout(() => {
+        if (this.state.status === 'avoiding_obstacle' && !this.movementTimer) {
+          this.setState({ status: 'idle', isObstacleDetected: false });
+        }
+      }, 2500);
       return false;
     }
 
@@ -397,6 +450,12 @@ export class SimulationController {
         status: 'avoiding_obstacle',
         isObstacleDetected: true
       });
+      // Auto-recover after 2.5s so robot isn't trapped in avoiding_obstacle forever
+      setTimeout(() => {
+        if (this.state.status === 'avoiding_obstacle' && !this.movementTimer) {
+          this.setState({ status: 'idle', isObstacleDetected: false });
+        }
+      }, 2500);
       return false;
     }
 
@@ -554,21 +613,32 @@ export class SimulationController {
       isObstacleDetected: false
     });
 
-    if (this.engineDelegate?.removeObstacle) {
-      this.engineDelegate.removeObstacle(id);
-      return;
-    }
-
-    // Re-check path if moving
-    if (this.state.status === 'moving' && this.state.currentDestination) {
+    // Re-check path if moving or avoiding obstacle
+    if ((this.state.status === 'moving' || this.state.status === 'avoiding_obstacle') && this.state.currentDestination) {
       const newRoute = this.generatePath(
         this.state.robotPosition.grid,
         this.state.currentDestination.gridPos,
         updated
       );
-      if (newRoute) {
-        this.setState({ activeRoute: newRoute });
+      if (newRoute && newRoute.length > 0) {
+        this.currentWaypointIndex = 0;
+        this.setState({
+          activeRoute: newRoute,
+          status: 'moving',
+          stats: {
+            ...this.state.stats,
+            totalWaypoints: newRoute.length,
+            waypointsRemaining: newRoute.length
+          }
+        });
+        if (!this.movementTimer) {
+          this.startMovementTicker();
+        }
       }
+    }
+
+    if (this.engineDelegate?.removeObstacle) {
+      this.engineDelegate.removeObstacle(id);
     }
   }
 
@@ -577,6 +647,30 @@ export class SimulationController {
       obstacles: [],
       isObstacleDetected: false
     });
+
+    if ((this.state.status === 'moving' || this.state.status === 'avoiding_obstacle') && this.state.currentDestination) {
+      const newRoute = this.generatePath(
+        this.state.robotPosition.grid,
+        this.state.currentDestination.gridPos,
+        []
+      );
+      if (newRoute && newRoute.length > 0) {
+        this.currentWaypointIndex = 0;
+        this.setState({
+          activeRoute: newRoute,
+          status: 'moving',
+          stats: {
+            ...this.state.stats,
+            totalWaypoints: newRoute.length,
+            waypointsRemaining: newRoute.length
+          }
+        });
+        if (!this.movementTimer) {
+          this.startMovementTicker();
+        }
+      }
+    }
+
     if (this.engineDelegate?.clearObstacles) {
       this.engineDelegate.clearObstacles();
     }

@@ -17,6 +17,7 @@ export function useSimulation() {
     startNavigation: (id) => simulationController.startNavigation(id),
     pauseNavigation: () => simulationController.pauseNavigation(),
     resumeNavigation: () => simulationController.resumeNavigation(),
+    stopNavigation: () => simulationController.stopNavigation(),
     resetSimulation: () => simulationController.resetSimulation(),
     addObstacle: (pos) => simulationController.addObstacle(pos),
     removeObstacle: (id) => simulationController.removeObstacle(id),

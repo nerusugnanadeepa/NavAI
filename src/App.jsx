@@ -51,6 +51,7 @@ export function App() {
     startNavigation,
     pauseNavigation,
     resumeNavigation,
+    stopNavigation,
     resetSimulation,
     addObstacle,
     removeObstacle,
@@ -69,6 +70,7 @@ export function App() {
   const [showWelcome, setShowWelcome] = useState(false);
   const [showDestinationsModal, setShowDestinationsModal] = useState(false);
   const [activeTab, setActiveTab] = useState('map');
+  const [cameraMode, setCameraMode] = useState('perspective');
   const [guidanceText, setGuidanceText] = useState(
     'Obstacle ahead. Recalculating route.\nTurn right and continue towards Library.'
   );
@@ -125,13 +127,20 @@ export function App() {
     }
   };
 
-  // Handle Start
+  // Handle Start (Bug 1.1 Fix: use user's selected destination, not hardcoded 'library')
   const handleStartNavigation = () => {
+    const destId = currentDestination?.id || 'library';
     if (!currentDestination) {
-      // default destination is Library if none selected yet
-      selectDestination('library');
+      selectDestination(destId);
     }
-    startNavigation('library');
+    startNavigation(destId);
+  };
+
+  // Handle Stop (Bug 3.3 Fix: actually stop navigation and cancel route)
+  const handleStopNavigation = () => {
+    stopNavigation();
+    speechOutput.speakPaused();
+    setGuidanceText('Navigation stopped. Standing by.');
   };
 
   // Handle Reset
@@ -221,17 +230,21 @@ export function App() {
     speechOutput.setMuted(next);
   };
 
-  // Location and metrics
+  // Location and metrics (Bug 3.4 Fix: do not fallback to Library when destination is null)
   const locDescription = getLocationDescription ? getLocationDescription() : 'Near Cafeteria';
-  const targetWorld = currentDestination?.worldPos || { x: 0, z: -10 };
+  const targetWorld = currentDestination?.worldPos;
   const curWorld = robotPosition?.world || { x: -5, z: 5.5 };
-  const distMeters = Math.max(0, Math.round(Math.hypot(targetWorld.x - curWorld.x, targetWorld.z - curWorld.z) * 1.5));
-  const distanceLeft = `${distMeters} m`;
-  const speedStr = `${(speed * 0.8).toFixed(1)} m/s`;
+  const distMeters = targetWorld
+    ? Math.max(0, Math.round(Math.hypot(targetWorld.x - curWorld.x, targetWorld.z - curWorld.z) * 1.5))
+    : 0;
+  const distanceLeft = currentDestination ? `${distMeters} m` : '0 m';
+  const speedStr = (status === 'moving' || status === 'avoiding_obstacle')
+    ? `${(speed * 0.8).toFixed(1)} m/s`
+    : '0.0 m/s';
 
   return (
     <div className="hud-fullscreen-wrapper">
-      {/* 1. Underlying Fullscreen 3D Campus Simulation (Bright sunny daytime campus with fountain, barricade, cyber path) */}
+      {/* 1. Underlying Fullscreen 3D Campus Simulation */}
       <div className="simulation-background-viewport">
         <ThreeSimulationCanvas 
           status={status}
@@ -239,6 +252,7 @@ export function App() {
           robotPosition={robotPosition}
           obstacles={obstacles}
           activeRoute={activeRoute}
+          cameraMode={cameraMode}
           onAddObstacleAtClick={(pos) => addObstacle(pos)}
           onRemoveObstacle={(id) => removeObstacle(id)}
         />
@@ -252,13 +266,30 @@ export function App() {
             activeTab={activeTab}
             onSelectTab={(tab) => {
               setActiveTab(tab);
+              if (tab === 'map') setCameraMode('perspective');
               if (tab === 'destinations') setShowDestinationsModal(true);
               if (tab === 'start') handleStartNavigation();
+              if (tab === 'simulation') setCameraMode(prev => prev === 'follow' ? 'perspective' : 'follow');
+              if (tab === 'camera') setCameraMode(prev => prev === 'pov' ? 'perspective' : 'pov');
+              if (tab === 'voice') speechOutput.speak(guidanceText, true);
               if (tab === 'settings') setShowWelcome(true);
             }}
             onOpenDestinations={() => setShowDestinationsModal(true)}
             onStartNavigation={handleStartNavigation}
-            onToggleVoice={() => {}}
+            onToggleVoice={() => speechOutput.speak(guidanceText, true)}
+          />
+        </div>
+
+        {/* Top-Center: Floating Command Bar (Text & Voice Commands) */}
+        <div className="hud-top-center-anchor">
+          <CommandBar
+            onExecuteCommand={(text) => {
+              const parsed = speechInput.parseCommand(text);
+              handleVoiceCommand(parsed, text);
+            }}
+            currentLanguage={currentLanguage}
+            isListening={false}
+            onToggleVoice={() => speechOutput.speak(guidanceText, true)}
           />
         </div>
 
@@ -275,7 +306,7 @@ export function App() {
           />
         </div>
 
-        {/* Bottom-Left: Campus Map (Top View) with route & obstacle */}
+        {/* Bottom-Left: Campus Map (Top View) with dynamic route & obstacle */}
         <div className="hud-bottom-left-anchor">
           <TopViewMinimap
             robotPosition={robotPosition}
@@ -294,7 +325,12 @@ export function App() {
             onStart={handleStartNavigation}
             onPause={pauseNavigation}
             onResume={resumeNavigation}
+            onStop={handleStopNavigation}
             onReset={handleResetSimulation}
+            cameraMode={cameraMode}
+            onSetCameraMode={setCameraMode}
+            speed={speed}
+            onSetSpeed={setSpeed}
           />
         </div>
 

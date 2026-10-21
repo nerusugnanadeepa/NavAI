@@ -104,25 +104,6 @@ export class SpeechInputEngine {
       .replace(/\s+/g, ' ')
       .trim();
 
-    // 1. Destination Navigation Commands (multilingual for Library, Cafeteria, Classroom, Main Gate)
-    for (const [destId, keywords] of Object.entries(MULTILINGUAL_DICTIONARY.destinations)) {
-      if (keywords.some(k => {
-        const normK = k.toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
-        return clean.includes(normK);
-      })) {
-        const destNames = {
-          library: 'Library',
-          cafeteria: 'Cafeteria',
-          computer_lab: 'Computer Lab',
-          classroom: 'Computer Lab',
-          auditorium: 'Auditorium',
-          main_gate: 'Main Gate'
-        };
-        const actualDestId = destId === 'classroom' ? 'computer_lab' : destId;
-        return { type: 'NAVIGATE_TO', destinationId: actualDestId, name: destNames[destId] };
-      }
-    }
-
     // Extract optional step count for directional movement (e.g. "forward 2", "ముందుకు 3")
     let steps = 1;
     const digitMatch = clean.match(/(\d+)/);
@@ -183,6 +164,25 @@ export class SpeechInputEngine {
     if (MULTILINGUAL_DICTIONARY.controls.reset.some(k => clean.includes(k.toLowerCase()))) {
       return { type: 'RESET_SIMULATION' };
     }
+    // 5. Destination Navigation Commands (multilingual for Library, Cafeteria, Computer Lab, Auditorium, Main Gate)
+    for (const [destId, keywords] of Object.entries(MULTILINGUAL_DICTIONARY.destinations)) {
+      if (keywords.some(k => {
+        const normK = k.toLowerCase().replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+        return clean.includes(normK);
+      })) {
+        const destNames = {
+          library: 'Library',
+          cafeteria: 'Cafeteria',
+          computer_lab: 'Computer Lab',
+          classroom: 'Computer Lab',
+          auditorium: 'Auditorium',
+          main_gate: 'Main Gate'
+        };
+        const actualDestId = destId === 'classroom' ? 'computer_lab' : destId;
+        return { type: 'NAVIGATE_TO', destinationId: actualDestId, name: destNames[destId] };
+      }
+    }
+
     if (MULTILINGUAL_DICTIONARY.controls.start.some(k => clean.includes(k.toLowerCase()))) {
       return { type: 'START_NAVIGATION' };
     }

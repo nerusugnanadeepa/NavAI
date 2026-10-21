@@ -851,30 +851,31 @@
   overflow: hidden;
 }
 
-/* HUD Glassmorphic Card Base */
+/* HUD Glassmorphic Card Base - Eye-Catching Neon & Deep Obsidian Glass */
 .hud-card {
   pointer-events: auto;
-  background: rgba(15, 23, 42, 0.82);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
-  border: 1px solid rgba(148, 163, 184, 0.22);
-  border-radius: 14px;
-  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.55);
+  background: rgba(10, 17, 32, 0.88);
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  border: 1px solid rgba(0, 242, 254, 0.28);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 22px rgba(0, 242, 254, 0.14);
   color: #f8fafc;
   overflow: hidden;
-  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .hud-card:hover {
-  border-color: rgba(56, 189, 248, 0.45);
-  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.65);
+  border-color: rgba(0, 242, 254, 0.55);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.75), 0 0 30px rgba(0, 242, 254, 0.22);
 }
 
 .hud-card-header {
-  padding: 10px 14px;
+  padding: 11px 16px;
   display: flex;
   align-items: center;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid rgba(0, 242, 254, 0.16);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, transparent 100%);
 }
 
 .hud-card-title {
@@ -882,6 +883,7 @@
   font-weight: 700;
   color: #ffffff;
   letter-spacing: -0.01em;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 /* --- 1. Top-Left: Brand Card & Vertical Menu Anchor --- */
@@ -892,7 +894,7 @@
   width: 250px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   pointer-events: auto;
   z-index: 20;
 }
@@ -900,32 +902,34 @@
 .left-sidebar-stack {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   width: 100%;
 }
 
 .brand-card {
   padding: 14px 16px;
+  border-left: 3px solid #00f2fe;
 }
 
 .brand-disc-icon {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #38bdf8, #0284c7 60%, #0369a1);
+  background: radial-gradient(circle at 35% 35%, #00f2fe, #0284c7 60%, #1e3a8a);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 18px rgba(56, 189, 248, 0.6);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 0 20px rgba(0, 242, 254, 0.7);
+  border: 2px solid rgba(255, 255, 255, 0.4);
 }
 
 .disc-inner-dot {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  background: #0f172a;
-  border: 2px solid #38bdf8;
+  background: #090e1a;
+  border: 2px solid #00f2fe;
+  box-shadow: inset 0 0 6px #00f2fe;
 }
 
 .brand-main-title {
@@ -935,6 +939,7 @@
   letter-spacing: -0.02em;
   line-height: 1.1;
   margin: 0;
+  text-shadow: 0 0 12px rgba(0, 242, 254, 0.4);
 }
 
 .brand-sub-title {
@@ -946,14 +951,15 @@
 
 .brand-action-tags {
   font-size: 10px;
-  color: #38bdf8;
-  font-weight: 600;
+  color: #00f2fe;
+  font-weight: 700;
   margin: 3px 0 0 0;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.04em;
+  text-shadow: 0 0 8px rgba(0, 242, 254, 0.6);
 }
 
 .nav-menu-card {
-  padding: 6px;
+  padding: 8px;
 }
 
 .nav-menu-list {
@@ -971,31 +977,132 @@
   align-items: center;
   gap: 12px;
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: 10px;
   background: transparent;
-  border: none;
+  border: 1px solid transparent;
   color: #cbd5e1;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   text-align: left;
 }
 
 .nav-menu-btn:hover {
-  background: rgba(56, 189, 248, 0.12);
-  color: #ffffff;
+  background: rgba(0, 242, 254, 0.12);
+  color: #00f2fe;
+  border-color: rgba(0, 242, 254, 0.25);
+  transform: translateX(4px);
 }
 
 .nav-menu-btn.active {
-  background: linear-gradient(90deg, rgba(2, 132, 199, 0.85), rgba(14, 165, 233, 0.65));
+  background: linear-gradient(90deg, #1d4ed8, #2563eb 60%, #00f2fe);
   color: #ffffff;
-  font-weight: 600;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.4);
+  font-weight: 700;
+  border-color: rgba(0, 242, 254, 0.5);
+  box-shadow: 0 4px 18px rgba(37, 99, 235, 0.6), 0 0 12px rgba(0, 242, 254, 0.35);
 }
 
 .nav-menu-icon {
   flex-shrink: 0;
+}
+
+/* --- Top-Center: Floating Command Bar Anchor (Matches Reference Picture 1) --- */
+.hud-top-center-anchor {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 460px;
+  max-width: calc(100vw - 640px);
+  display: flex;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 25;
+}
+
+.header-command-bar {
+  display: flex;
+  align-items: center;
+  background: rgba(10, 17, 32, 0.88);
+  backdrop-filter: blur(20px) saturate(190%);
+  border: 1px solid rgba(0, 242, 254, 0.4);
+  border-radius: 9999px;
+  padding: 6px 8px 6px 14px;
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.6), 0 0 24px rgba(0, 242, 254, 0.25);
+  transition: all 0.2s ease;
+}
+
+.header-command-bar:hover,
+.header-command-bar:focus-within {
+  border-color: rgba(0, 242, 254, 0.7);
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.7), 0 0 32px rgba(0, 242, 254, 0.4);
+}
+
+.command-mic-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: rgba(30, 41, 59, 0.8);
+  border: 1px solid rgba(0, 242, 254, 0.35);
+  color: #00f2fe;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.command-mic-btn:hover {
+  background: #0284c7;
+  color: #ffffff;
+  box-shadow: 0 0 14px rgba(0, 242, 254, 0.8);
+  transform: scale(1.08);
+}
+
+.command-mic-btn.listening {
+  background: #ef4444;
+  color: #ffffff;
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.9);
+}
+
+.command-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 0 12px;
+}
+
+.command-input::placeholder {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.command-send-btn {
+  background: linear-gradient(135deg, #0284c7, #2563eb);
+  color: #ffffff;
+  border: none;
+  border-radius: 9999px;
+  padding: 8px 18px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  box-shadow: 0 0 16px rgba(37, 99, 235, 0.6);
+  transition: all 0.2s ease;
+}
+
+.command-send-btn:hover {
+  background: linear-gradient(135deg, #00f2fe, #2563eb);
+  box-shadow: 0 0 22px rgba(0, 242, 254, 0.85);
+  transform: scale(1.05);
 }
 
 /* --- 2. Top-Right: Robot Status Card Anchor --- */
@@ -1016,36 +1123,64 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 2px 8px;
+  padding: 3px 10px;
   border-radius: 12px;
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .status-navigating {
-  background: rgba(16, 185, 129, 0.2);
-  border: 1px solid rgba(16, 185, 129, 0.5);
+  background: rgba(16, 185, 129, 0.22);
+  border: 1px solid #10b981;
   color: #34d399;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.45);
 }
 
 .status-ready {
-  background: rgba(56, 189, 248, 0.2);
-  border: 1px solid rgba(56, 189, 248, 0.5);
-  color: #38bdf8;
+  background: rgba(0, 242, 254, 0.2);
+  border: 1px solid #00f2fe;
+  color: #00f2fe;
+  box-shadow: 0 0 14px rgba(0, 242, 254, 0.35);
 }
 
 .status-dot {
-  width: 6px;
-  height: 6px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: currentColor;
+  box-shadow: 0 0 8px currentColor;
+}
+
+.header-lang-selector-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+
+.header-lang-select {
+  background: transparent;
+  border: none;
+  color: #f1f5f9;
+  font-size: 11px;
+  font-weight: 600;
+  outline: none;
+  cursor: pointer;
+}
+
+.header-lang-select option {
+  background: #0f172a;
+  color: #f8fafc;
 }
 
 .robot-status-table {
-  padding: 10px 14px;
+  padding: 12px 16px;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 10px;
 }
 
 .status-row {
@@ -1057,11 +1192,12 @@
 
 .status-label {
   color: #94a3b8;
+  font-weight: 500;
 }
 
 .status-val {
-  color: #f1f5f9;
-  font-weight: 500;
+  color: #ffffff;
+  font-weight: 600;
 }
 
 /* --- 3. Bottom-Left: Campus Map (Top View) Anchor --- */
@@ -1079,7 +1215,7 @@
 }
 
 .minimap-container {
-  padding: 10px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -1088,9 +1224,10 @@
 .minimap-svg {
   width: 100%;
   height: 160px;
-  border-radius: 8px;
-  border: 1px solid rgba(148, 163, 184, 0.25);
-  background: #0f172a;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 242, 254, 0.3);
+  background: #090e1a;
+  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.6);
 }
 
 .minimap-legend {
@@ -1098,21 +1235,23 @@
   align-items: center;
   justify-content: space-around;
   width: 100%;
-  margin-top: 8px;
+  margin-top: 10px;
   font-size: 11px;
   color: #cbd5e1;
+  font-weight: 600;
 }
 
 .legend-item {
   display: flex;
   align-items: center;
-  gap: 5px;
+  gap: 6px;
 }
 
 .legend-dot {
   width: 8px;
   height: 8px;
   border-radius: 50%;
+  box-shadow: 0 0 8px currentColor;
 }
 
 /* --- 4. Bottom-Center: Navigation Controls Anchor --- */
@@ -1126,15 +1265,15 @@
 }
 
 .nav-controls-card {
-  padding: 10px 18px 14px 18px;
-  background: rgba(15, 23, 42, 0.88);
-  border-radius: 18px;
+  padding: 12px 22px 16px 22px;
+  border-radius: 22px;
+  border-bottom: 3px solid #00f2fe;
 }
 
 .nav-controls-circle-row {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 22px;
   margin-top: 10px;
 }
 
@@ -1146,21 +1285,21 @@
 }
 
 .circle-control-btn {
-  width: 52px;
-  height: 52px;
+  width: 54px;
+  height: 54px;
   border-radius: 50%;
-  border: none;
+  border: 2px solid rgba(255, 255, 255, 0.25);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #ffffff;
   transition: all 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.5);
 }
 
 .circle-control-btn:hover:not(:disabled) {
-  transform: translateY(-3px) scale(1.06);
+  transform: translateY(-4px) scale(1.08);
 }
 
 .circle-control-btn:active:not(:disabled) {
@@ -1168,7 +1307,7 @@
 }
 
 .circle-control-btn:disabled {
-  opacity: 0.4;
+  opacity: 0.35;
   cursor: not-allowed;
   transform: none;
 }
@@ -1176,31 +1315,44 @@
 /* Green Start */
 .btn-circle-start {
   background: radial-gradient(circle at 35% 35%, #10b981, #059669);
-  box-shadow: 0 0 18px rgba(16, 185, 129, 0.5);
+  box-shadow: 0 0 24px rgba(16, 185, 129, 0.7);
+}
+
+.btn-circle-start:hover:not(:disabled) {
+  box-shadow: 0 0 32px rgba(16, 185, 129, 0.95);
 }
 
 /* Slate Pause */
 .btn-circle-pause {
   background: radial-gradient(circle at 35% 35%, #475569, #1e293b);
-  box-shadow: 0 0 14px rgba(71, 85, 105, 0.4);
+  box-shadow: 0 0 16px rgba(71, 85, 105, 0.5);
 }
 
 /* Red Stop */
 .btn-circle-stop {
   background: radial-gradient(circle at 35% 35%, #ef4444, #dc2626);
-  box-shadow: 0 0 18px rgba(239, 68, 68, 0.5);
+  box-shadow: 0 0 24px rgba(239, 68, 68, 0.7);
+}
+
+.btn-circle-stop:hover:not(:disabled) {
+  box-shadow: 0 0 32px rgba(239, 68, 68, 0.95);
 }
 
 /* Blue Reset */
 .btn-circle-reset {
-  background: radial-gradient(circle at 35% 35%, #3b82f6, #2563eb);
-  box-shadow: 0 0 18px rgba(59, 130, 246, 0.5);
+  background: radial-gradient(circle at 35% 35%, #0284c7, #2563eb);
+  box-shadow: 0 0 24px rgba(2, 132, 199, 0.7);
+}
+
+.btn-circle-reset:hover:not(:disabled) {
+  box-shadow: 0 0 32px rgba(0, 242, 254, 0.95);
 }
 
 .nav-btn-label {
   font-size: 11px;
-  font-weight: 600;
-  color: #e2e8f0;
+  font-weight: 700;
+  color: #f1f5f9;
+  letter-spacing: 0.02em;
 }
 
 /* --- 5. Bottom-Right: Camera View & Voice Assistant Stack Anchor --- */
@@ -1513,16 +1665,40 @@
 }
 
 @media (max-width: 1024px) {
-  .hud-overlay-container {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto auto auto auto auto;
+  .hud-fullscreen-wrapper {
     overflow-y: auto;
+  }
+  .hud-overlay-container {
+    position: relative;
+    width: 100%;
+    min-height: 100vh;
+    height: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    padding: 16px;
+    overflow-y: visible;
     pointer-events: auto;
   }
-  .left-sidebar-stack, .hud-top-right-anchor, .hud-bottom-left-anchor, .hud-bottom-center-anchor, .hud-bottom-right-anchor {
-    grid-column: 1;
+  .hud-top-left-anchor,
+  .hud-top-center-anchor,
+  .hud-top-right-anchor,
+  .hud-bottom-left-anchor,
+  .hud-bottom-center-anchor,
+  .hud-bottom-right-anchor {
+    position: relative !important;
+    top: auto !important;
+    bottom: auto !important;
+    left: auto !important;
+    right: auto !important;
+    transform: none !important;
+    width: 100% !important;
+    max-width: 540px;
+    margin: 0 auto;
+    pointer-events: auto;
+  }
+  .left-sidebar-stack {
     width: 100%;
-    justify-self: stretch;
   }
 }
 

@@ -50,7 +50,7 @@ export function RobotStatusCard({
         <div className="status-row">
           <span className="status-label">Destination</span>
           <span className="status-val text-cyan-400 font-semibold">
-            {currentDestination ? currentDestination.name : 'Library'}
+            {currentDestination ? currentDestination.name : 'None (Standing By)'}
           </span>
         </div>
         <div className="status-row">

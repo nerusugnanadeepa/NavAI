@@ -5,7 +5,9 @@ import {
   Coffee, 
   DoorOpen, 
   MapPin, 
-  Navigation
+  Navigation,
+  Monitor,
+  Theater
 } from 'lucide-react';
 import { DESTINATIONS } from '../simulation/simulationController';
 import { LANGUAGE_UI_TEXTS } from '../voice/languages';
@@ -13,6 +15,8 @@ import { LANGUAGE_UI_TEXTS } from '../voice/languages';
 const ICON_MAP = {
   library: BookOpen,
   classroom: GraduationCap,
+  computer_lab: Monitor,
+  auditorium: Theater,
   cafeteria: Coffee,
   main_gate: DoorOpen
 };

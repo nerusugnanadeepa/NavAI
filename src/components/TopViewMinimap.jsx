@@ -91,37 +91,72 @@ export function TopViewMinimap({
             <text y="1.2" textAnchor="middle" fill="#f8fafc" fontSize="3.0" fontWeight="bold">Main Gate</text>
           </g>
 
-          {/* Blocked Red Dashed Trajectory Line leading to obstacle */}
-          <line
-            x1={robotPt.x}
-            y1={robotPt.y}
-            x2="35"
-            y2="45"
-            stroke="#ef4444"
-            strokeWidth="1.8"
-            strokeDasharray="2.5 1.5"
-          />
+          {/* Dynamic Blocked Red Dashed Trajectory Line leading to obstacle only when avoiding obstacle */}
+          {status === 'avoiding_obstacle' && obstacles && obstacles.length > 0 && (() => {
+            const nearestObs = obstacles[obstacles.length - 1];
+            const obsPt = toSvg(nearestObs.grid || nearestObs);
+            return (
+              <line
+                x1={robotPt.x}
+                y1={robotPt.y}
+                x2={obsPt.x}
+                y2={obsPt.y}
+                stroke="#ef4444"
+                strokeWidth="1.8"
+                strokeDasharray="2.5 1.5"
+              />
+            );
+          })()}
 
-          {/* Active Glowing Cyan Navigation Route curving smoothly around fountain */}
-          <path
-            d={`M ${robotPt.x} ${robotPt.y} Q 40 60 48 56 Q 60 52 58 40 Q 55 30 50 18`}
-            fill="none"
-            stroke="#00f2fe"
-            strokeWidth="2.4"
-            strokeLinecap="round"
-          />
+          {/* Dynamic Active Glowing Cyan Navigation Route */}
+          {activeRoute && activeRoute.length > 1 ? (
+            <path
+              d={activeRoute.reduce((acc, wp, idx) => {
+                const pt = toSvg(wp.grid || wp);
+                return idx === 0 ? `M ${pt.x} ${pt.y}` : `${acc} L ${pt.x} ${pt.y}`;
+              }, '')}
+              fill="none"
+              stroke="#00f2fe"
+              strokeWidth="2.2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          ) : (
+            currentDestination && (
+              <line
+                x1={robotPt.x}
+                y1={robotPt.y}
+                x2={toSvg(currentDestination.gridPos).x}
+                y2={toSvg(currentDestination.gridPos).y}
+                stroke="#00f2fe"
+                strokeWidth="1.6"
+                strokeDasharray="2 2"
+              />
+            )
+          )}
 
-          {/* Red Obstacle Marker */}
-          <g transform="translate(35, 45)">
-            <rect x="-3.5" y="-2" width="7" height="4" rx="1" fill="#dc2626" stroke="#ffffff" strokeWidth="0.6" />
-            <circle cx="0" cy="0" r="1.2" fill="#ffffff" />
-          </g>
+          {/* Dynamic Obstacle Markers */}
+          {obstacles && obstacles.map((obs, idx) => {
+            const pt = toSvg(obs.grid || obs);
+            return (
+              <g key={obs.id || idx} transform={`translate(${pt.x}, ${pt.y})`}>
+                <rect x="-3" y="-1.8" width="6" height="3.6" rx="0.8" fill="#dc2626" stroke="#ffffff" strokeWidth="0.6" />
+                <circle cx="0" cy="0" r="1" fill="#ffffff" />
+              </g>
+            );
+          })}
 
-          {/* Green Destination Pin (At Library entrance) */}
-          <g transform="translate(50, 18)">
-            <circle cx="0" cy="0" r="3.2" fill="#10b981" stroke="#ffffff" strokeWidth="0.8" />
-            <circle cx="0" cy="0" r="1.2" fill="#ffffff" />
-          </g>
+          {/* Dynamic Destination Pin (Only when destination is selected) */}
+          {currentDestination && (() => {
+            const destPt = toSvg(currentDestination.gridPos);
+            return (
+              <g transform={`translate(${destPt.x}, ${destPt.y})`}>
+                <circle cx="0" cy="0" r="4.2" fill="none" stroke="#10b981" strokeWidth="0.8" opacity="0.6" className="animate-ping" />
+                <circle cx="0" cy="0" r="3.2" fill="#10b981" stroke="#ffffff" strokeWidth="0.8" />
+                <circle cx="0" cy="0" r="1.2" fill="#ffffff" />
+              </g>
+            );
+          })()}
 
           {/* Blue Robot Circular Marker with Direction Arrow */}
           <g transform={`translate(${robotPt.x}, ${robotPt.y}) rotate(${robotHeading})`}>
