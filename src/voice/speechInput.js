@@ -44,9 +44,31 @@ export class SpeechInputEngine {
         }
       };
     }
+
+    if (typeof window !== 'undefined') {
+      window.onAndroidMicPermissionResult = (granted) => {
+        if (granted) {
+          this.notifyState('idle');
+          if (this.pendingStartListening) {
+            this.pendingStartListening = false;
+            this.startListening(this.onResultCallback, this.onStateChangeCallback, this.onErrorCallback);
+          }
+        } else {
+          this.isListening = false;
+          this.pendingStartListening = false;
+          this.notifyState('error', 'Microphone permission denied');
+          if (this.onErrorCallback) {
+            this.onErrorCallback('Microphone permission denied');
+          }
+        }
+      };
+    }
   }
 
   isSupported() {
+    if (typeof window !== 'undefined' && window.AndroidNativeSpeech) {
+      return true;
+    }
     return Boolean(this.recognition);
   }
 
@@ -65,16 +87,64 @@ export class SpeechInputEngine {
   }
 
   startListening(onResult, onStateChange, onError) {
+    this.onResultCallback = onResult;
+    this.onStateChangeCallback = onStateChange;
+    this.onErrorCallback = onError;
+
+    const langObj = SUPPORTED_LANGUAGES.find(l => l.code === this.currentLang) || SUPPORTED_LANGUAGES[0];
+    const langTag = langObj.langTag || 'en-US';
+
+    // 1. Check if running inside Android APK with native Android SpeechRecognizer
+    if (typeof window !== 'undefined' && window.AndroidNativeSpeech) {
+      window.onAndroidSpeechResult = (text) => {
+        const transcript = text ? text.trim() : '';
+        const command = this.parseCommand(transcript);
+        this.isListening = false;
+        this.notifyState('idle');
+        if (this.onResultCallback) {
+          this.onResultCallback({ transcript, command });
+        }
+      };
+
+      window.onAndroidSpeechPartialResult = (partialText) => {
+        if (this.onStateChangeCallback) {
+          this.onStateChangeCallback({ state: 'listening', partial: partialText });
+        }
+      };
+
+      window.onAndroidSpeechState = (state) => {
+        this.isListening = (state === 'listening' || state === 'speaking' || state === 'processing');
+        this.notifyState(state);
+      };
+
+      window.onAndroidSpeechError = (errorMsg) => {
+        this.isListening = false;
+        this.notifyState('error', errorMsg);
+        if (this.onErrorCallback) {
+          this.onErrorCallback(errorMsg);
+        }
+      };
+
+      try {
+        window.AndroidNativeSpeech.startListening(langTag);
+        this.isListening = true;
+        this.notifyState('listening');
+        return true;
+      } catch (err) {
+        console.warn('Native Android speech start error:', err);
+        if (onError) onError(err.message || 'Error starting Android microphone');
+        return false;
+      }
+    }
+
+    // 2. Standard Web Speech API (Chrome / Edge / Safari)
     if (!this.recognition) {
       if (onError) onError('Speech recognition is not supported in this browser.');
       return false;
     }
 
-    this.onResultCallback = onResult;
-    this.onStateChangeCallback = onStateChange;
-    this.onErrorCallback = onError;
-
     try {
+      this.recognition.lang = langTag;
       this.recognition.start();
       return true;
     } catch (err) {
@@ -84,6 +154,15 @@ export class SpeechInputEngine {
   }
 
   stopListening() {
+    if (typeof window !== 'undefined' && window.AndroidNativeSpeech) {
+      try {
+        window.AndroidNativeSpeech.stopListening();
+      } catch (e) {}
+      this.isListening = false;
+      this.notifyState('idle');
+      return;
+    }
+
     if (this.recognition && this.isListening) {
       try {
         this.recognition.stop();
@@ -155,6 +234,9 @@ export class SpeechInputEngine {
     }
 
     // 6. Navigation Control Commands (multilingual)
+    if (MULTILINGUAL_DICTIONARY.controls.stop && MULTILINGUAL_DICTIONARY.controls.stop.some(k => clean.includes(k.toLowerCase()))) {
+      return { type: 'STOP_NAVIGATION' };
+    }
     if (MULTILINGUAL_DICTIONARY.controls.pause.some(k => clean.includes(k.toLowerCase()))) {
       return { type: 'PAUSE_NAVIGATION' };
     }

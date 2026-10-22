@@ -6,11 +6,12 @@ export function CameraViewCard({ isObstacleDetected, currentDestination }) {
   const canvasRef = useRef(null);
 
   useEffect(() => {
+    const canvas = canvasRef.current;
     let attached = false;
     const tryAttach = () => {
       const engine = simulationController.engineDelegate;
-      if (engine && canvasRef.current && !attached) {
-        engine.attachPovCanvas(canvasRef.current);
+      if (engine && canvas && !attached) {
+        engine.attachPovCanvas(canvas);
         attached = true;
       }
     };
@@ -26,8 +27,10 @@ export function CameraViewCard({ isObstacleDetected, currentDestination }) {
 
     return () => {
       clearInterval(interval);
-      if (attached && simulationController.engineDelegate) {
-        simulationController.engineDelegate.attachPovCanvas(null);
+      if (attached && simulationController.engineDelegate && canvas) {
+        if (typeof simulationController.engineDelegate.detachPovCanvas === 'function') {
+          simulationController.engineDelegate.detachPovCanvas(canvas);
+        }
       }
     };
   }, []);

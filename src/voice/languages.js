@@ -134,12 +134,20 @@ export const MULTILINGUAL_DICTIONARY = {
       'ಪ್ರಾರಂಭಿಸು', 'ಹೋಗು', 'ಶುರು ಮಾಡು'
     ],
     pause: [
-      'pause', 'stop', 'hold', 'halt', 'wait', 'freeze',
-      'ఆపు', 'విరామం', 'స్టాప్', 'ఆగు',
-      'रुको', 'रोकें', 'ठहरो', 'पॉज़',
-      'നിർത്തുക', 'താൽക്കാലികമായി നിർത്തുക', 'പോസ്',
-      'நிறுத்து', 'தற்காலிகமாக நிறுத்து', 'நில்',
-      'ನಿಲ್ಲಿಸು', 'ತಡೆಹಿಡಿ', 'ವಿರಾಮ', 'ನಿಲ್ಲು'
+      'pause', 'hold', 'wait', 'freeze',
+      'విరామం', 'ఆగు',
+      'ठहरो', 'पॉज़',
+      'താൽക്കാലികമായി നിർത്തുക', 'പോസ്',
+      'தற்காலிகமாக நிறுத்து', 'நில்',
+      'ತಡೆಹಿಡಿ', 'ವಿರಾಮ', 'ನಿಲ್ಲು'
+    ],
+    stop: [
+      'stop', 'halt', 'cancel', 'terminate', 'end navigation',
+      'ఆపు', 'స్టాప్', 'రద్దు చేయి',
+      'रुको', 'रोकें', 'रोक दो', 'बंद करो',
+      'നിർത്തുക', 'സ്റ്റോപ്പ്', 'റദ്ദാക്കുക',
+      'நிறுத்து', 'ஸ்டாப்', 'ரத்து செய்',
+      'ನಿಲ್ಲಿಸು', 'ಸ್ಟಾಪ್', 'ರದ್ದುಮಾಡು'
     ],
     resume: [
       'resume', 'continue', 'keep going', 'proceed',
@@ -192,6 +200,34 @@ export const MULTILINGUAL_DICTIONARY = {
   }
 };
 
+export const DIRECTION_TRANSLATIONS = {
+  North: { en: 'North', te: 'ఉత్తరం', hi: 'उत्तर', ml: 'വടക്ക്', ta: 'வடக்கு', kn: 'ಉತ್ತರ' },
+  South: { en: 'South', te: 'దక్షిణం', hi: 'दक्षिण', ml: 'തെക്ക്', ta: 'தெற்கு', kn: 'ದಕ್ಷಿಣ' },
+  East: { en: 'East', te: 'తూర్పు', hi: 'पूर्व', ml: 'കിഴക്ക്', ta: 'கிழக்கு', kn: 'ಪೂರ್ವ' },
+  West: { en: 'West', te: 'పడమర', hi: 'पश्चिम', ml: 'പടിഞ്ഞാറ്', ta: 'மேற்கு', kn: 'ಪಶ್ಚಿಮ' },
+  'North-East': { en: 'North-East', te: 'ఈశాన్యం', hi: 'उत्तर-पूर्व', ml: 'വടക്കുകിഴക്ക്', ta: 'வடகிழக்கு', kn: 'ಈಶಾನ್ಯ' },
+  'North-West': { en: 'North-West', te: 'వాయువ్యం', hi: 'उत्तर-पश्चिम', ml: 'വടക്കുപടിഞ്ഞാറ്', ta: 'வடமேற்கு', kn: 'ವಾಯುವ್ಯ' },
+  'South-East': { en: 'South-East', te: 'ఆగ్నేయం', hi: 'दक्षिण-पूर्व', ml: 'തെക്കുകിഴക്ക്', ta: 'தென்கிழக்கு', kn: 'ಆಗ್ನೇಯ' },
+  'South-West': { en: 'South-West', te: 'నైరుతి', hi: 'दक्षिण-पश्चिम', ml: 'തെക്കുപടിഞ്ഞാറ്', ta: 'தென்மேற்கு', kn: 'ನೈಋತ್ಯ' }
+};
+
+export const TURN_TRANSLATIONS = {
+  left: { en: 'left', te: 'ఎడమవైపు', hi: 'बाएं', ml: 'ഇടത്തോട്ട്', ta: 'இடதுபுறம்', kn: 'ಎಡಕ್ಕೆ' },
+  right: { en: 'right', te: 'కుడివైపు', hi: 'दाएं', ml: 'വലത്തോട്ട്', ta: 'வலதுபுறம்', kn: 'ಬಲಕ್ಕೆ' },
+  straight: { en: 'straight', te: 'సూటిగా', hi: 'सीधे', ml: 'നേരെ', ta: 'நேராக', kn: 'ನೇರವಾಗಿ' }
+};
+
+export function translateDirection(dir, lang = 'en') {
+  if (!dir) return dir;
+  return DIRECTION_TRANSLATIONS[dir]?.[lang] || DIRECTION_TRANSLATIONS[dir]?.en || dir;
+}
+
+export function translateTurn(turn, lang = 'en') {
+  if (!turn) return turn;
+  const key = turn.toLowerCase();
+  return TURN_TRANSLATIONS[key]?.[lang] || TURN_TRANSLATIONS[key]?.en || turn;
+}
+
 export const LANGUAGE_UI_TEXTS = {
   te: {
     commandPlaceholder: "ఉదా: 'లైబ్రరీకి వెళ్ళు', 'కాఫెటేరియాకి వెళ్ళు', 'ముందుకు వెళ్ళు'...",
@@ -218,15 +254,34 @@ export const LANGUAGE_UI_TEXTS = {
       'రీసెట్ చేయి'
     ],
     speech: {
-      navStarted: (dest) => `${dest} వైపు నావిగేషన్ ప్రారంభించబడింది. సురక్షిత మార్గాన్ని లెక్కిస్తున్నాము.`,
-      obstacleDetected: (dest = 'లైబ్రరీ', dir = 'కుడివైపు') => `ముందు అడ్డంకి ఉంది. మార్గం మార్చబడుతోంది. ${dir === 'left' ? 'ఎడమవైపు' : 'కుడివైపు'} తిరిగి ${dest} వైపు కొనసాగండి.`,
-      turnGuidance: (dir = 'కుడివైపు', landmark = 'లైబ్రరీ') => `${dir === 'left' ? 'ఎడమవైపు' : 'కుడివైపు'} తిరగండి మరియు ${landmark} వైపు వెళ్ళండి.`,
-      routeRecalculated: (dest = 'లైబ్రరీ') => `అడ్డంకిని నివారించే ప్రత్యామ్నాయ మార్గం సిద్ధమైంది. ${dest} వైపు నావిగేషన్ కొనసాగుతోంది.`,
-      destinationReached: (dest) => `లక్ష్యం చేరుకుంది: ${dest}. నావిగేషన్ విజయవంతంగా పూర్తయింది.`,
-      noRoute: () => 'హెచ్చరిక: మార్గం మూసివేయబడింది. సురక్షిత మార్గం అందుబాటులో లేదు.',
-      paused: () => 'నావిగేషన్ నిలిపివేయబడింది.',
-      resumed: () => 'నావిగేషన్ తిరిగి ప్రారంభమైంది.',
-      reset: () => 'సిమ్యులేషన్ రీసెట్ చేయబడింది.'
+      navStarted: (dest, dir = 'ఉత్తరం', loc = 'ప్రారంభ స్థానం') =>
+        `${dest} వైపు నావిగేషన్ ప్రారంభించబడింది. ${loc} నుండి ${dir} వైపు ప్రయాణిస్తున్నాము.`,
+      obstacleDetected: (obs = 'రోడ్డు అడ్డంకి', dest = 'లైబ్రరీ', detourDir = 'కుడివైపు', pathway = 'తూర్పు మార్గం') =>
+        `హెచ్చరిక: ముందు ${obs} గుర్తించబడింది! ${dest} వైపు మార్గం నిరోధించబడింది. ప్రత్యామ్నాయ మార్గాన్ని లెక్కిస్తున్నాము.`,
+      alternateRoute: (detourDir = 'కుడివైపు', pathway = 'తూర్పు మార్గం', dest = 'లైబ్రరీ', dir = 'ఉత్తరం') =>
+        `ప్రత్యామ్నాయ మార్గం ఎంచుకోబడింది: అడ్డంకిని నివారించడానికి ${detourDir} తిరిగి ${pathway} గుండా ${dir} వైపు ${dest} కి కొనసాగుతున్నాము.`,
+      turnGuidance: (turnDir = 'కుడివైపు', newDir = 'ఉత్తరం', pathway = 'క్యాంపస్ మార్గం', dest = 'లైబ్రరీ') =>
+        `${turnDir} తిరిగి ${pathway} పై ${newDir} వైపు ${dest} దిశగా వెళ్తున్నాము.`,
+      manualMove: (action, dir = 'ఉత్తరం') =>
+        action === 'backward' ? 'వెనుకకు రివర్స్ వెళ్తున్నాము.' : `ముందుకు ఒక అడుగు వేస్తున్నాము, దిశ: ${dir}.`,
+      manualTurn: (turnDir = 'కుడివైపు', newDir = 'ఉత్తరం') =>
+        `${turnDir} 90 డిగ్రీలు తిరిగాము. ఇప్పుడు రోబోట్ దిశ: ${newDir}.`,
+      obstacleBlockedMove: () =>
+        'ముందుకు వెళ్ళలేము: నేరుగా ముందు అడ్డంకి ఉంది!',
+      obstacleAdded: (label = 'అడ్డంకి') =>
+        `క్యాంపస్ గ్రిడ్‌పై కొత్త అడ్డంకి (${label}) జోడించబడింది. మార్గ భద్రతను స్కాన్ చేస్తున్నాము.`,
+      obstaclesCleared: (dest = 'లైబ్రరీ') =>
+        `అడ్డంకులు తొలగించబడ్డాయి. ${dest} వైపు నేరుగా సురక్షిత మార్గాన్ని పునఃప్రారంభిస్తున్నాము.`,
+      destinationReached: (dest) =>
+        `లక్ష్యం చేరుకుంది: ${dest} వద్దకు సురక్షితంగా చేరుకున్నారు! నావిగేషన్ విజయవంతంగా పూర్తయింది.`,
+      noRoute: () =>
+        'హెచ్చరిక: మార్గాలన్నీ మూసివేయబడ్డాయి. సురక్షిత ప్రత్యామ్నాయ మార్గం అందుబాటులో లేదు.',
+      paused: () =>
+        'నావిగేషన్ తాత్కాలికంగా నిలిపివేయబడింది. రోబోట్ ఆగింది.',
+      resumed: (dest = 'లక్ష్యం', dir = 'ఉత్తరం') =>
+        `${dest} వైపు నావిగేషన్ పునఃప్రారంభించబడింది, ప్రయాణ దిశ: ${dir}.`,
+      reset: () =>
+        'సిమ్యులేషన్ రీసెట్ చేయబడింది. ప్రారంభ డాక్ వద్ద వేచి ఉంది.'
     }
   },
   en: {
@@ -254,15 +309,34 @@ export const LANGUAGE_UI_TEXTS = {
       'Reset Simulation'
     ],
     speech: {
-      navStarted: (dest) => `Navigation initiated towards ${dest}. Calculating collision-free route.`,
-      obstacleDetected: (dest = 'Library', dir = 'right') => `Obstacle ahead. Recalculating route. Turn ${dir} and continue towards ${dest}.`,
-      turnGuidance: (dir = 'right', landmark = 'Library') => `Turn ${dir} and continue towards ${landmark}.`,
-      routeRecalculated: (dest = 'Library') => `Alternative route calculated. Resuming autonomous navigation towards ${dest}.`,
-      destinationReached: (dest) => `Destination reached: ${dest}. Navigation completed successfully.`,
-      noRoute: () => 'Alert: Path is blocked. No safe alternative route found in the simulation.',
-      paused: () => 'Navigation paused.',
-      resumed: () => 'Navigation resumed.',
-      reset: () => 'Simulation reset to origin dock.'
+      navStarted: (dest, dir = 'North', loc = 'Dock') =>
+        `Navigation started towards ${dest}. Heading ${dir} from ${loc}.`,
+      obstacleDetected: (obs = 'Road Barricade', dest = 'Library', detourDir = 'right', pathway = 'East Pathway') =>
+        `Obstacle detected ahead: ${obs} is blocking the direct path to ${dest}! Recalculating alternate route.`,
+      alternateRoute: (detourDir = 'right', pathway = 'East Pathway', dest = 'Library', dir = 'North') =>
+        `Taking alternate route: turning ${detourDir} via ${pathway} heading ${dir} towards ${dest}.`,
+      turnGuidance: (turnDir = 'right', newDir = 'North', pathway = 'Campus Walkway', dest = 'Library') =>
+        `Turning ${turnDir} onto ${pathway}, heading ${newDir} towards ${dest}.`,
+      manualMove: (action, dir = 'North') =>
+        action === 'backward' ? 'Moving backward in reverse.' : `Moving forward 1 step, heading ${dir}.`,
+      manualTurn: (turnDir = 'right', newDir = 'North') =>
+        `Turned ${turnDir} 90 degrees. Robot is now facing ${newDir}.`,
+      obstacleBlockedMove: () =>
+        'Cannot move forward: obstacle detected directly ahead!',
+      obstacleAdded: (label = 'Hazard') =>
+        `Obstacle placed: ${label} on campus grid. Scanning path for conflicts.`,
+      obstaclesCleared: (dest = 'Library') =>
+        `Obstacles cleared. Resuming direct optimal path towards ${dest}.`,
+      destinationReached: (dest) =>
+        `Destination reached: You have safely arrived at ${dest}! Navigation completed successfully.`,
+      noRoute: () =>
+        'Alert: Path is blocked. No safe alternative route found in the simulation.',
+      paused: () =>
+        'Navigation paused. Robot stopped.',
+      resumed: (dest = 'Destination', dir = 'North') =>
+        `Navigation resumed towards ${dest}, heading ${dir}.`,
+      reset: () =>
+        'Simulation reset to origin dock. Standing by for destination.'
     }
   },
   hi: {
@@ -290,15 +364,34 @@ export const LANGUAGE_UI_TEXTS = {
       'रीसेट करो'
     ],
     speech: {
-      navStarted: (dest) => `${dest} की ओर नेविगेशन शुरू हो गया है। सुरक्षित मार्ग की गणना की जा रही है।`,
-      obstacleDetected: (dest = 'लाइब्रेरी', dir = 'दाएं') => `आगे रुकावट है। नया रास्ता खोजा जा रहा है। ${dir === 'left' ? 'बाएं' : 'दाएं'} मुड़ें और ${dest} की ओर बढ़ें।`,
-      turnGuidance: (dir = 'दाएं', landmark = 'लाइब्रेरी') => `${dir === 'left' ? 'बाएं' : 'दाएं'} मुड़ें और ${landmark} की ओर बढ़ें।`,
-      routeRecalculated: (dest = 'लाइब्रेरी') => `वैकल्पिक मार्ग मिल गया है। ${dest} की ओर स्वायत्त नेविगेशन जारी है।`,
-      destinationReached: (dest) => `गंतव्य पहुंच गए: ${dest}। नेविगेशन सफलतापूर्वक पूरा हुआ।`,
-      noRoute: () => 'चेतावनी: मार्ग अवरुद्ध है। कोई सुरक्षित रास्ता उपलब्ध नहीं है।',
-      paused: () => 'नेविगेशन रोक दिया गया है।',
-      resumed: () => 'नेविगेशन फिर से शुरू हो गया है।',
-      reset: () => 'सिमुलेशन मूल डॉक पर रीसेट हो गया है।'
+      navStarted: (dest, dir = 'उत्तर', loc = 'मूल स्थान') =>
+        `${dest} की ओर नेविगेशन शुरू हुआ। ${loc} से ${dir} दिशा में आगे बढ़ रहे हैं।`,
+      obstacleDetected: (obs = 'रुकावट', dest = 'लाइब्रेरी', detourDir = 'दाएं', pathway = 'पूर्वी मार्ग') =>
+        `आगे बाधा मिली: ${obs} ने ${dest} का सीधा रास्ता रोक दिया है! वैकल्पिक मार्ग खोजा जा रहा है।`,
+      alternateRoute: (detourDir = 'दाएं', pathway = 'पूर्वी मार्ग', dest = 'लाइब्रेरी', dir = 'उत्तर') =>
+        `वैकल्पिक रास्ता चुना गया: बाधा से बचने के लिए ${detourDir} मुड़कर ${pathway} से ${dir} दिशा में ${dest} की ओर बढ़ रहे हैं।`,
+      turnGuidance: (turnDir = 'दाएं', newDir = 'उत्तर', pathway = 'कैंपस मार्ग', dest = 'लाइब्रेरी') =>
+        `${turnDir} मुड़कर ${pathway} पर ${newDir} दिशा में ${dest} की ओर बढ़ें।`,
+      manualMove: (action, dir = 'उत्तर') =>
+        action === 'backward' ? 'पीछे रिवर्स चल रहे हैं।' : `एक कदम आगे बढ़ रहे हैं, दिशा: ${dir}।`,
+      manualTurn: (turnDir = 'दाएं', newDir = 'उत्तर') =>
+        `${turnDir} 90 अंश मुड़े। रोबोट अब ${newDir} दिशा में है।`,
+      obstacleBlockedMove: () =>
+        'आगे नहीं बढ़ सकते: ठीक सामने बाधा उपस्थित है!',
+      obstacleAdded: (label = 'बाधा') =>
+        `कैंपस ग्रिड पर बाधा (${label}) जोड़ी गई। मार्ग सुरक्षा जांची जा रही है।`,
+      obstaclesCleared: (dest = 'लाइब्रेरी') =>
+        `बाधाएं हटा दी गई हैं। ${dest} की ओर सीधा मार्ग बहाल किया गया।`,
+      destinationReached: (dest) =>
+        `गंतव्य पहुंच गए: आप सुरक्षित रूप से ${dest} पहुंच चुके हैं! नेविगेशन संपन्न हुआ।`,
+      noRoute: () =>
+        'चेतावनी: मार्ग अवरुद्ध है। कोई सुरक्षित वैकल्पिक रास्ता उपलब्ध नहीं है।',
+      paused: () =>
+        'नेविगेशन रोक दिया गया है। रोबोट रुका हुआ है।',
+      resumed: (dest = 'गंतव्य', dir = 'उत्तर') =>
+        `${dest} की ओर नेविगेशन फिर से शुरू, दिशा: ${dir}।`,
+      reset: () =>
+        'सिमुलेशन मूल डॉक पर रीसेट हो गया है।'
     }
   },
   ml: {
@@ -326,15 +419,34 @@ export const LANGUAGE_UI_TEXTS = {
       'റീസെറ്റ് ചെയ്യുക'
     ],
     speech: {
-      navStarted: (dest) => `${dest} ലേക്ക് നാവിഗേഷൻ ആരംഭിച്ചു. സുരക്ഷിത പാത കണ്ടെത്തുന്നു.`,
-      obstacleDetected: (dest = 'ലൈബ്രറി', dir = 'വലത്തോട്ട്') => `മുന്നിൽ തടസ്സം കണ്ടെത്തി. പുതിയ പാത കണ്ടെത്തുന്നു. ${dir === 'left' ? 'ഇടത്തോട്ട്' : 'വലത്തോട്ട്'} തിരിഞ്ഞ് ${dest} ലേക്ക് തുടരുക.`,
-      turnGuidance: (dir = 'വലത്തോട്ട്', landmark = 'ലൈബ്രറി') => `${dir === 'left' ? 'ഇടത്തോട്ട്' : 'വലത്തോട്ട്'} തിരിയുക, ${landmark} ലേക്ക് തുടരുക.`,
-      routeRecalculated: (dest = 'ലൈബ്രറി') => `ഇതര പാത കണ്ടെത്തി. ${dest} ലേക്ക് ഓട്ടോണമസ് നാവിഗേഷൻ തുടരുന്നു.`,
-      destinationReached: (dest) => `ലക്ഷ്യസ്ഥാനത്ത് എത്തി: ${dest}. നാവിഗേഷൻ വിജയകരമായി പൂർത്തിയായി.`,
-      noRoute: () => 'മുന്നറിയിപ്പ്: വഴി തടസ്സപ്പെട്ടിരിക്കുന്നു. സുരക്ഷിതമായ പാത ലഭ്യമല്ല.',
-      paused: () => 'നാവിഗേഷൻ നിർത്തിവെച്ചു.',
-      resumed: () => 'നാവിഗേഷൻ പുനരാരംഭിച്ചു.',
-      reset: () => 'സിമുലേഷൻ ആദ്യ സ്ഥാനത്തേക്ക് പുനഃക്രമീകരിച്ചു.'
+      navStarted: (dest, dir = 'വടക്ക്', loc = 'ഡ്രൈവ് ഡോക്ക്') =>
+        `${dest} ലേക്ക് നാവിഗേഷൻ ആരംഭിച്ചു. ${loc} ൽ നിന്ന് ${dir} ദിശയിലേക്ക് നീങ്ങുന്നു.`,
+      obstacleDetected: (obs = 'തടസ്സം', dest = 'ലൈബ്രറി', detourDir = 'വലത്തോട്ട്', pathway = 'കിഴക്കൻ പാത') =>
+        `മുന്നറിയിപ്പ്: മുന്നിൽ ${obs} കണ്ടെത്തി! ${dest} ലേക്കുള്ള വഴി തടസ്സപ്പെട്ടിരിക്കുന്നു. ഇതര പാത കണ്ടെത്തുന്നു.`,
+      alternateRoute: (detourDir = 'വലത്തോട്ട്', pathway = 'കിഴക്കൻ പാത', dest = 'ലൈബ്രറി', dir = 'വടക്ക്') =>
+        `ഇതര പാത തിരഞ്ഞെടുക്കുന്നു: തടസ്സം ഒഴിവാക്കാൻ ${detourDir} തിരിഞ്ഞ് ${pathway} വഴി ${dir} ദിശയിലേക്ക് ${dest} ലേക്ക് പോകുന്നു.`,
+      turnGuidance: (turnDir = 'വലത്തോട്ട്', newDir = 'വടക്ക്', pathway = 'പാത', dest = 'ലൈബ്രറി') =>
+        `${turnDir} തിരിഞ്ഞ് ${pathway} ലൂടെ ${newDir} ദിശയിലേക്ക് ${dest} ലേക്ക് നീങ്ങുക.`,
+      manualMove: (action, dir = 'വടക്ക്') =>
+        action === 'backward' ? 'പുറകോട്ട് റിവേഴ്സ് നീങ്ങുന്നു.' : `ഒരു പടി മുന്നോട്ട് നീങ്ങുന്നു, ദിശ: ${dir}.`,
+      manualTurn: (turnDir = 'വലത്തോട്ട്', newDir = 'വടക്ക്') =>
+        `${turnDir} 90 ഡിഗ്രി തിരിഞ്ഞു. ഇപ്പോൾ റോബോട്ടിന്റെ ദിശ: ${newDir}.`,
+      obstacleBlockedMove: () =>
+        'മുന്നോട്ട് പോകാനാകില്ല: മുന്നിൽ തടസ്സമുണ്ട്!',
+      obstacleAdded: (label = 'തടസ്സം') =>
+        `ക്യാമ്പസ് ഗ്രിഡിൽ ${label} ചേർത്തു. സുരക്ഷാ സ്കാനിംഗ് നടത്തുന്നു.`,
+      obstaclesCleared: (dest = 'ലൈബ്രറി') =>
+        `തടസ്സങ്ങൾ നീക്കി. ${dest} ലേക്കുള്ള നേരിട്ടുള്ള പാത പുനരാരംഭിച്ചു.`,
+      destinationReached: (dest) =>
+        `ലക്ഷ്യസ്ഥാനത്ത് എത്തി: നിങ്ങൾ ${dest} ൽ സുരക്ഷിതമായി എത്തിച്ചേർന്നു! നാവിഗേഷൻ പൂർത്തിയായി.`,
+      noRoute: () =>
+        'മുന്നറിയിപ്പ്: എല്ലാ വഴികളും തടസ്സപ്പെട്ടു. സുരക്ഷിതമായ ഇതര പാത ലഭ്യമല്ല.',
+      paused: () =>
+        'നാവിഗേഷൻ നിർത്തിവെച്ചു. റോബോട്ട് കാത്തുനിൽക്കുന്നു.',
+      resumed: (dest = 'ലക്ഷ്യസ്ഥാനം', dir = 'വടക്ക്') =>
+        `${dest} ലേക്ക് നാവിഗേഷൻ പുനരാരംഭിച്ചു, ദിശ: ${dir}.`,
+      reset: () =>
+        'സിമുലേഷൻ ആദ്യ സ്ഥാനത്തേക്ക് പുനഃക്രമീകരിച്ചു.'
     }
   },
   ta: {
@@ -362,15 +474,34 @@ export const LANGUAGE_UI_TEXTS = {
       'மீட்டமை'
     ],
     speech: {
-      navStarted: (dest) => `${dest} நோக்கி வழிகாட்டல் தொடங்கியது. பாதுகாப்பான பாதை கணக்கிடப்படுகிறது.`,
-      obstacleDetected: (dest = 'நூலகம்', dir = 'வலதுபுறம்') => `முன்னே தடை கண்டறியப்பட்டது. மாற்றுப் பாதை கணக்கிடப்படுகிறது. ${dir === 'left' ? 'இடதுபுறம்' : 'வலதுபுறம்'} திரும்பி ${dest} நோக்கி தொடரவும்.`,
-      turnGuidance: (dir = 'வலதுபுறம்', landmark = 'நூலகம்') => `${dir === 'left' ? 'இடதுபுறம்' : 'வலதுபுறம்'} திரும்பி ${landmark} நோக்கி தொடரவும்.`,
-      routeRecalculated: (dest = 'நூலகம்') => `மாற்றுப் பாதை கண்டறியப்பட்டது. ${dest} நோக்கி தன்னாட்சி வழிகாட்டல் தொடர்கிறது.`,
-      destinationReached: (dest) => `இலக்கை அடைந்தது: ${dest}. வழிகாட்டல் வெற்றிகரமாக முடிந்தது.`,
-      noRoute: () => 'எச்சரிக்கை: பாதை அடைக்கப்பட்டுள்ளது. பாதுகாப்பான மாற்று வழி இல்லை.',
-      paused: () => 'வழிகாட்டல் தற்காலிகமாக நிறுத்தப்பட்டது.',
-      resumed: () => 'வழிகாட்டல் மீண்டும் தொடர்கிறது.',
-      reset: () => 'உருவகப்படுத்துதல் ஆரம்ப நிலைக்கு மீட்டமைக்கப்பட்டது.'
+      navStarted: (dest, dir = 'வடக்கு', loc = 'ஆரம்ப நிலை') =>
+        `${dest} நோக்கி வழிகாட்டல் தொடங்கியது. ${loc} இலிருந்து ${dir} திசையில் பயணிக்கிறது.`,
+      obstacleDetected: (obs = 'தடை', dest = 'நூலகம்', detourDir = 'வலதுபுறம்', pathway = 'கிழக்கு பாதை') =>
+        `எச்சரிக்கை: முன்னே ${obs} கண்டறியப்பட்டது! ${dest} செல்லும் பாதை அடைக்கப்பட்டுள்ளது. மாற்றுப் பாதை கணக்கிடப்படுகிறது.`,
+      alternateRoute: (detourDir = 'வலதுபுறம்', pathway = 'கிழக்கு பாதை', dest = 'நூலகம்', dir = 'வடக்கு') =>
+        `மாற்றுப் பாதை எடுக்கப்படுகிறது: தடையைத் தவிர்க்க ${detourDir} திரும்பி ${pathway} வழியாக ${dir} திசையில் ${dest} நோக்கி செல்கிறது.`,
+      turnGuidance: (turnDir = 'வலதுபுறம்', newDir = 'வடக்கு', pathway = 'பாதை', dest = 'நூலகம்') =>
+        `${turnDir} திரும்பி ${pathway} வழியாக ${newDir} திசையில் ${dest} நோக்கி செல்லவும்.`,
+      manualMove: (action, dir = 'வடக்கு') =>
+        action === 'backward' ? 'பின்னோக்கி ரிவர்ஸ் செல்கிறது.' : `ஒரு அடி முன்னோக்கி நகர்கிறது, திசை: ${dir}.`,
+      manualTurn: (turnDir = 'வலதுபுறம்', newDir = 'வடக்கு') =>
+        `${turnDir} 90 டிகிரி திரும்பியது. இப்போது ரோபோவின் திசை: ${newDir}.`,
+      obstacleBlockedMove: () =>
+        'முன்னே செல்ல முடியாது: நேரே தடை உள்ளது!',
+      obstacleAdded: (label = 'தடை') =>
+        `வளாகத்தில் புதிய தடை (${label}) சேர்க்கப்பட்டது. பாதுகாப்பு சோதிக்கப்படுகிறது.`,
+      obstaclesCleared: (dest = 'நூலகம்') =>
+        `தடைகள் நீக்கப்பட்டன. ${dest} நோக்கி நேரடிப் பாதை மீண்டும் தொடங்கப்பட்டது.`,
+      destinationReached: (dest) =>
+        `இலக்கை அடைந்தது: நீங்கள் ${dest} ஐ பாதுகாப்பாக அடைந்துவிட்டீர்கள்! வழிகாட்டல் வெற்றிகரமாக முடிந்தது.`,
+      noRoute: () =>
+        'எச்சரிக்கை: அனைத்து வழிகளும் அடைக்கப்பட்டுள்ளன. மாற்றுப் பாதை கிடைக்கவில்லை.',
+      paused: () =>
+        'வழிகாட்டல் தற்காலிகமாக நிறுத்தப்பட்டது.',
+      resumed: (dest = 'இலக்கு', dir = 'வடக்கு') =>
+        `${dest} நோக்கி வழிகாட்டல் மீண்டும் தொடங்கியது, திசை: ${dir}.`,
+      reset: () =>
+        'உருவகப்படுத்துதல் ஆரம்ப நிலைக்கு மீட்டமைக்கப்பட்டது.'
     }
   },
   kn: {
@@ -398,15 +529,35 @@ export const LANGUAGE_UI_TEXTS = {
       'ರೀಸೆಟ್ ಮಾಡು'
     ],
     speech: {
-      navStarted: (dest) => `${dest} ಕಡೆಗೆ ನ್ಯಾವಿಗೇಷನ್ ಪ್ರಾರಂಭವಾಗಿದೆ. ಸುರಕ್ಷಿತ ಮಾರ್ಗವನ್ನು ಲೆಕ್ಕಹಾಕಲಾಗುತ್ತಿದೆ.`,
-      obstacleDetected: (dest = 'ಗ್ರಂಥಾಲಯ', dir = 'ಬಲಕ್ಕೆ') => `ಮುಂದೆ ಅಡಚಣೆ ಕಂಡುಬಂದಿದೆ. ಪರ್ಯಾಯ ಮಾರ್ಗ ಲೆಕ್ಕಹಾಕಲಾಗುತ್ತಿದೆ. ${dir === 'left' ? 'ಎಡಕ್ಕೆ' : 'ಬಲಕ್ಕೆ'} ತಿರುಗಿ ${dest} ಕಡೆಗೆ ಮುಂದುವರಿಯಿರಿ.`,
-      turnGuidance: (dir = 'ಬಲಕ್ಕೆ', landmark = 'ಗ್ರಂಥಾಲಯ') => `${dir === 'left' ? 'ಎಡಕ್ಕೆ' : 'ಬಲಕ್ಕೆ'} ತಿರುಗಿ ${landmark} ಕಡೆಗೆ ಮುಂದುವರಿಯಿರಿ.`,
-      routeRecalculated: (dest = 'ಗ್ರಂಥಾಲಯ') => `ಪರ್ಯಾಯ ಮಾರ್ಗ ಸಿದ್ಧವಾಗಿದೆ. ${dest} ಕಡೆಗೆ ಸ್ವಾಯತ್ತ ಚಾಲನೆ ಮುಂದುವರಿದಿದೆ.`,
-      destinationReached: (dest) => `ಗುರಿ ತಲುಪಿದೆ: ${dest}. ನ್ಯಾವಿಗೇಷನ್ ಯಶಸ್ವಿಯಾಗಿ ಪೂರ್ಣಗೊಂಡಿದೆ.`,
-      noRoute: () => 'ಎಚ್ಚರಿಕೆ: ಮಾರ್ಗ ನಿರ್ಬಂಧಿಸಲಾಗಿದೆ. ಯಾವುದೇ ಸುರಕ್ಷಿತ ಮಾರ್ಗ ಲಭ್ಯವಿಲ್ಲ.',
-      paused: () => 'ನ್ಯಾವಿಗೇಷನ್ ವಿರಾಮಗೊಳಿಸಲಾಗಿದೆ.',
-      resumed: () => 'ನ್ಯಾವಿಗೇಷನ್ ಪುನರಾರಂಭಗೊಂಡಿದೆ.',
-      reset: () => 'ಸಿಮ್ಯುಲೇಶನ್ ಅನ್ನು ಪ್ರಾರಂಭಿಕ ಸ್ಥಾನಕ್ಕೆ ಮರುಹೊಂದಿಸಲಾಗಿದೆ.'
+      navStarted: (dest, dir = 'ಉತ್ತರ', loc = 'ಆರಂಭಿಕ ಡಾಕ್') =>
+        `${dest} ಕಡೆಗೆ ನ್ಯಾವಿಗೇಷನ್ ಪ್ರಾರಂಭವಾಗಿದೆ. ${loc} ನಿಂದ ${dir} ದಿಕ್ಕಿನಲ್ಲಿ ಚಲಿಸುತ್ತಿದೆ.`,
+      obstacleDetected: (obs = 'ಅಡಚಣೆ', dest = 'ಗ್ರಂಥಾಲಯ', detourDir = 'ಬಲಕ್ಕೆ', pathway = 'ಪೂರ್ವ ಮಾರ್ಗ') =>
+        `ಎಚ್ಚರಿಕೆ: ಮುಂದೆ ${obs} ಕಂಡುಬಂದಿದೆ! ${dest} ಕಡೆಗೆ ಮಾರ್ಗ ತಡೆಯಲ್ಪಟ್ಟಿದೆ. ಪರ್ಯಾಯ ಮಾರ್ಗ ಲೆಕ್ಕಹಾಕಲಾಗುತ್ತಿದೆ.`,
+      alternateRoute: (detourDir = 'ಬಲಕ್ಕೆ', pathway = 'ಪೂರ್ವ ಮಾರ್ಗ', dest = 'ಗ್ರಂಥಾಲಯ', dir = 'ಉತ್ತರ') =>
+        `ಪರ್ಯಾಯ ಮಾರ್ಗ ಆಯ್ಕೆಮಾಡಲಾಗಿದೆ: ಅಡಚಣೆ ತಪ್ಪಿಸಲು ${detourDir} ತಿರುಗಿ ${pathway} ಮೂಲಕ ${dir} ದಿಕ್ಕಿನಲ್ಲಿ ${dest} ಕಡೆಗೆ ಸಾಗುತ್ತಿದೆ.`,
+      turnGuidance: (turnDir = 'ಬಲಕ್ಕೆ', newDir = 'ಉತ್ತರ', pathway = 'ಮಾರ್ಗ', dest = 'ಗ್ರಂಥಾಲಯ') =>
+        `${turnDir} ತಿರುಗಿ ${pathway} ಮೂಲಕ ${newDir} ದಿಕ್ಕಿನಲ್ಲಿ ${dest} ಕಡೆಗೆ ಮುಂದುವರಿಯಿರಿ.`,
+      manualMove: (action, dir = 'ಉತ್ತರ') =>
+        action === 'backward' ? 'ಹಿಂದಕ್ಕೆ ರಿವರ್ಸ್ ಹೋಗುತ್ತಿದೆ.' : `ಒಂದು ಹೆಜ್ಜೆ ಮುಂದೆ ಸಾಗುತ್ತಿದೆ, ದಿಕ್ಕು: ${dir}.`,
+      manualTurn: (turnDir = 'ಬಲಕ್ಕೆ', newDir = 'ಉತ್ತರ') =>
+        `${turnDir} 90 ಡಿಗ್ರಿ ತಿರುಗಿದೆ. ಈಗ ರೋಬೋಟ್ ದಿಕ್ಕು: ${newDir}.`,
+      obstacleBlockedMove: () =>
+        'ಮುಂದೆ ಹೋಗಲು ಸಾಧ್ಯವಿಲ್ಲ: ನೇರವಾಗಿ ಅಡಚಣೆಯಿದೆ!',
+      obstacleAdded: (label = 'ಅಡಚಣೆ') =>
+        `ಕ್ಯಾಂಪಸ್ ಗ್ರಿಡ್‌ನಲ್ಲಿ ${label} ಸೇರಿಸಲಾಗಿದೆ. ಮಾರ್ಗ ಸುರಕ್ಷತೆ ಪರಿಶೀಲಿಸಲಾಗುತ್ತಿದೆ.`,
+      obstaclesCleared: (dest = 'ಗ್ರಂಥಾಲಯ') =>
+        `ಅಡಚಣೆಗಳನ್ನು ತೆರವುಗೊಳಿಸಲಾಗಿದೆ. ${dest} ಕಡೆಗೆ ನೇರ ಮಾರ್ಗ ಪುನರಾರಂಭಗೊಂಡಿದೆ.`,
+      destinationReached: (dest) =>
+        `ಗುರಿ ತಲುಪಿದೆ: ನೀವು ${dest} ಅನ್ನು ಸುರಕ್ಷಿತವಾಗಿ ತಲುಪಿದ್ದೀರಿ! ನ್ಯಾವಿಗೇಷನ್ ಪೂರ್ಣಗೊಂಡಿದೆ.`,
+      noRoute: () =>
+        'ಎಚ್ಚರಿಕೆ: ಎಲ್ಲಾ ಮಾರ್ಗಗಳು ನಿರ್ಬಂಧಿಸಲ್ಪಟ್ಟಿವೆ. ಯಾವುದೇ ಪರ್ಯಾಯ ಮಾರ್ಗವಿಲ್ಲ.',
+      paused: () =>
+        'ನ್ಯಾವಿಗೇಷನ್ ವಿರಾಮಗೊಳಿಸಲಾಗಿದೆ. ರೋಬೋಟ್ ನಿಂತಿದೆ.',
+      resumed: (dest = 'ಗುರಿ', dir = 'ಉತ್ತರ') =>
+        `${dest} ಕಡೆಗೆ ನ್ಯಾವಿಗೇಷನ್ ಪುನರಾರಂಭಗೊಂಡಿದೆ, ದಿಕ್ಕು: ${dir}.`,
+      reset: () =>
+        'ಸಿಮ್ಯುಲೇಶನ್ ಅನ್ನು ಪ್ರಾರಂಭಿಕ ಸ್ಥಾನಕ್ಕೆ ಮರುಹೊಂದಿಸಲಾಗಿದೆ.'
     }
   }
 };
+

@@ -11,7 +11,7 @@ export const DESTINATIONS = [
     name: 'Library',
     category: 'Academic Hub',
     description: 'Central campus library & study commons',
-    gridPos: { x: 10, y: 2 },
+    gridPos: { x: 10, y: 0 },
     worldPos: { x: 0, y: 0, z: -10 },
     color: '#3B82F6',
     estimatedDist: '25m'
@@ -21,7 +21,7 @@ export const DESTINATIONS = [
     name: 'Cafeteria',
     category: 'Dining Commons',
     description: 'Campus cafeteria & student pavilion',
-    gridPos: { x: 3, y: 8 },
+    gridPos: { x: 1, y: 8 },
     worldPos: { x: -9, y: 0, z: -2 },
     color: '#F59E0B',
     estimatedDist: '12m'
@@ -31,7 +31,7 @@ export const DESTINATIONS = [
     name: 'Computer Lab',
     category: 'Computing Center',
     description: 'High-performance AI & Computing labs',
-    gridPos: { x: 17, y: 7 },
+    gridPos: { x: 19, y: 7 },
     worldPos: { x: 9, y: 0, z: -3 },
     color: '#06B6D4',
     estimatedDist: '18m'
@@ -41,7 +41,7 @@ export const DESTINATIONS = [
     name: 'Auditorium',
     category: 'Events & Lectures',
     description: 'Main campus auditorium & conference hall',
-    gridPos: { x: 17, y: 16 },
+    gridPos: { x: 19, y: 18 },
     worldPos: { x: 9, y: 0, z: 8 },
     color: '#A855F7',
     estimatedDist: '22m'
@@ -51,7 +51,7 @@ export const DESTINATIONS = [
     name: 'Main Gate',
     category: 'Campus Entry',
     description: 'South stone archway and visitor entrance',
-    gridPos: { x: 3, y: 16 },
+    gridPos: { x: 2, y: 18 },
     worldPos: { x: -8, y: 0, z: 8 },
     color: '#10B981',
     estimatedDist: '15m'
@@ -79,6 +79,41 @@ export const INITIAL_ROUTE = [
   { grid: { x: 10, y: 0 }, world: { x: 0, y: 0, z: -10 } }
 ];
 
+export function getCardinalDirection(dx, dy) {
+  if (dx === 0 && dy < 0) return 'North';
+  if (dx === 0 && dy > 0) return 'South';
+  if (dx > 0 && dy === 0) return 'East';
+  if (dx < 0 && dy === 0) return 'West';
+  if (dx > 0 && dy < 0) return 'North-East';
+  if (dx < 0 && dy < 0) return 'North-West';
+  if (dx > 0 && dy > 0) return 'South-East';
+  if (dx < 0 && dy > 0) return 'South-West';
+  return 'North';
+}
+
+export function getHeadingDirection(headingDeg) {
+  const norm = ((headingDeg % 360) + 360) % 360;
+  if (norm >= 337.5 || norm < 22.5) return 'North';
+  if (norm >= 22.5 && norm < 67.5) return 'North-East';
+  if (norm >= 67.5 && norm < 112.5) return 'East';
+  if (norm >= 112.5 && norm < 157.5) return 'South-East';
+  if (norm >= 157.5 && norm < 202.5) return 'South';
+  if (norm >= 202.5 && norm < 247.5) return 'South-West';
+  if (norm >= 247.5 && norm < 292.5) return 'West';
+  return 'North-West';
+}
+
+export function getPathwayName(gridX, gridY) {
+  if (gridY <= 5) return 'Library North Walkway';
+  if (gridX <= 6 && gridY <= 12) return 'Cafeteria West Corridor';
+  if (gridX >= 14 && gridY <= 12) return 'Computer Lab East Corridor';
+  if (gridX >= 14 && gridY > 12) return 'Auditorium South-East Pathway';
+  if (gridX <= 6 && gridY > 12) return 'Main Gate South-West Pathway';
+  if (gridX > 11) return 'East Pathway';
+  if (gridX < 9) return 'West Pathway';
+  return 'Central Plaza Pathway';
+}
+
 export class SimulationController {
   constructor() {
     this.state = {
@@ -91,6 +126,9 @@ export class SimulationController {
       speed: 1.0,
       isObstacleDetected: false,
       blockedSegment: null,
+      blockedObstacle: null,
+      detourInfo: null,
+      lastAction: null,
       stats: {
         waypointsRemaining: INITIAL_ROUTE.length,
         totalWaypoints: INITIAL_ROUTE.length,
@@ -106,6 +144,7 @@ export class SimulationController {
     this.replanTimeout = null;
     this.planningTimeout = null;
     this.currentWaypointIndex = 0;
+    this.lastTurnWaypointIndex = 0;
     this.cumulativeDistance = 0;
   }
 
@@ -181,7 +220,7 @@ export class SimulationController {
     if (world.x < -3 && world.z >= 2) return 'Near Main Gate';
     if (world.x > 3 && world.z < 2) return 'Near Computer Lab';
     if (world.x > 3 && world.z >= 2) return 'Near Auditorium';
-    return 'Central Plaza Fountain';
+    return 'Central Plaza';
   }
 
   selectDestination(destinationId) {
@@ -235,7 +274,13 @@ export class SimulationController {
 
     this.setState({
       status: 'planning',
-      isObstacleDetected: false
+      isObstacleDetected: false,
+      lastAction: {
+        type: 'planning',
+        destinationName: dest.name,
+        location: this.getLocationDescription(),
+        timestamp: Date.now()
+      }
     });
 
     if (this.planningTimeout) {
@@ -252,14 +297,34 @@ export class SimulationController {
       this.planningTimeout = null;
       const route = this.generatePath(this.state.robotPosition.grid, dest.gridPos, this.state.obstacles);
       if (!route || route.length === 0) {
-        this.setState({ status: 'no_route' });
+        this.setState({
+          status: 'no_route',
+          lastAction: {
+            type: 'no_route',
+            destinationName: dest.name,
+            timestamp: Date.now()
+          }
+        });
         return;
       }
 
       this.currentWaypointIndex = 0;
+      this.lastTurnWaypointIndex = 0;
+      const firstWp = route[1] || route[0];
+      const initialDx = firstWp.grid.x - this.state.robotPosition.grid.x;
+      const initialDy = firstWp.grid.y - this.state.robotPosition.grid.y;
+      const initialDir = getCardinalDirection(initialDx, initialDy);
+
       this.setState({
         status: 'moving',
         activeRoute: route,
+        lastAction: {
+          type: 'nav_started',
+          destinationName: dest.name,
+          direction: initialDir,
+          location: this.getLocationDescription(),
+          timestamp: Date.now()
+        },
         stats: {
           ...this.state.stats,
           totalWaypoints: route.length,
@@ -287,7 +352,14 @@ export class SimulationController {
       this.replanTimeout = null;
     }
 
-    this.setState({ status: 'paused' });
+    this.setState({
+      status: 'paused',
+      lastAction: {
+        type: 'paused',
+        destinationName: this.state.currentDestination?.name || 'Destination',
+        timestamp: Date.now()
+      }
+    });
 
     if (this.engineDelegate?.pauseNavigation) {
       this.engineDelegate.pauseNavigation();
@@ -297,7 +369,16 @@ export class SimulationController {
   resumeNavigation() {
     if (this.state.status !== 'paused') return;
 
-    this.setState({ status: 'moving' });
+    const currentDir = getHeadingDirection(this.state.robotPosition.heading);
+    this.setState({
+      status: 'moving',
+      lastAction: {
+        type: 'resumed',
+        destinationName: this.state.currentDestination?.name || 'Destination',
+        direction: currentDir,
+        timestamp: Date.now()
+      }
+    });
     this.startMovementTicker();
 
     if (this.engineDelegate?.resumeNavigation) {
@@ -323,7 +404,11 @@ export class SimulationController {
     this.setState({
       status: 'idle',
       activeRoute: [],
-      isObstacleDetected: false
+      isObstacleDetected: false,
+      lastAction: {
+        type: 'stopped',
+        timestamp: Date.now()
+      }
     });
 
     if (this.engineDelegate?.stopNavigation) {
@@ -356,6 +441,12 @@ export class SimulationController {
       progressPercent: 0,
       isObstacleDetected: false,
       blockedSegment: null,
+      blockedObstacle: null,
+      detourInfo: null,
+      lastAction: {
+        type: 'reset',
+        timestamp: Date.now()
+      },
       stats: {
         ...this.state.stats,
         waypointsRemaining: 0,
@@ -385,14 +476,19 @@ export class SimulationController {
     const nextGridY = Math.min(19, Math.max(1, this.state.robotPosition.grid.y + dy));
 
     // Collision detection with obstacles
-    const isBlocked = this.state.obstacles.some(
+    const blockedObs = this.state.obstacles.find(
       obs => Math.hypot(obs.grid.x - nextGridX, obs.grid.y - nextGridY) < 1.3
     );
 
-    if (isBlocked) {
+    if (blockedObs) {
       this.setState({
         status: 'avoiding_obstacle',
-        isObstacleDetected: true
+        isObstacleDetected: true,
+        lastAction: {
+          type: 'obstacle_blocked_move',
+          obstacleLabel: blockedObs.label || 'Obstacle',
+          timestamp: Date.now()
+        }
       });
       // Auto-recover after 2.5s so robot isn't trapped in avoiding_obstacle forever
       setTimeout(() => {
@@ -408,6 +504,7 @@ export class SimulationController {
     const miniRoute = [{ grid: startPt }, { grid: targetPt }];
 
     this.cumulativeDistance += 1.2 * steps;
+    const currentDir = getHeadingDirection(this.state.robotPosition.heading);
 
     this.setState({
       status: 'moving',
@@ -416,6 +513,11 @@ export class SimulationController {
         grid: targetPt,
         world: { x: targetPt.x - 10, y: 0, z: targetPt.y - 10 },
         heading: this.state.robotPosition.heading
+      },
+      lastAction: {
+        type: 'manual_forward',
+        direction: currentDir,
+        timestamp: Date.now()
       },
       stats: {
         ...this.state.stats,
@@ -444,14 +546,19 @@ export class SimulationController {
     const nextGridX = Math.min(19, Math.max(1, this.state.robotPosition.grid.x + dx));
     const nextGridY = Math.min(19, Math.max(1, this.state.robotPosition.grid.y + dy));
 
-    const isBlocked = this.state.obstacles.some(
+    const blockedObs = this.state.obstacles.find(
       obs => Math.hypot(obs.grid.x - nextGridX, obs.grid.y - nextGridY) < 1.3
     );
 
-    if (isBlocked) {
+    if (blockedObs) {
       this.setState({
         status: 'avoiding_obstacle',
-        isObstacleDetected: true
+        isObstacleDetected: true,
+        lastAction: {
+          type: 'obstacle_blocked_move',
+          obstacleLabel: blockedObs.label || 'Obstacle',
+          timestamp: Date.now()
+        }
       });
       // Auto-recover after 2.5s so robot isn't trapped in avoiding_obstacle forever
       setTimeout(() => {
@@ -467,6 +574,7 @@ export class SimulationController {
     const miniRoute = [{ grid: startPt }, { grid: targetPt }];
 
     this.cumulativeDistance += 1.2 * steps;
+    const reverseDir = getHeadingDirection((this.state.robotPosition.heading + 180) % 360);
 
     this.setState({
       status: 'moving',
@@ -475,6 +583,11 @@ export class SimulationController {
         grid: targetPt,
         world: { x: targetPt.x - 10, y: 0, z: targetPt.y - 10 },
         heading: this.state.robotPosition.heading
+      },
+      lastAction: {
+        type: 'manual_backward',
+        direction: reverseDir,
+        timestamp: Date.now()
       },
       stats: {
         ...this.state.stats,
@@ -493,10 +606,17 @@ export class SimulationController {
 
   turnLeft() {
     const newHeading = (this.state.robotPosition.heading - 90 + 360) % 360;
+    const newDir = getHeadingDirection(newHeading);
     this.setState({
       robotPosition: {
         ...this.state.robotPosition,
         heading: newHeading
+      },
+      lastAction: {
+        type: 'manual_turn',
+        turn: 'left',
+        direction: newDir,
+        timestamp: Date.now()
       }
     });
     return true;
@@ -504,10 +624,17 @@ export class SimulationController {
 
   turnRight() {
     const newHeading = (this.state.robotPosition.heading + 90) % 360;
+    const newDir = getHeadingDirection(newHeading);
     this.setState({
       robotPosition: {
         ...this.state.robotPosition,
         heading: newHeading
+      },
+      lastAction: {
+        type: 'manual_turn',
+        turn: 'right',
+        direction: newDir,
+        timestamp: Date.now()
       }
     });
     return true;
@@ -555,6 +682,9 @@ export class SimulationController {
       case 'PAUSE_NAVIGATION':
         this.pauseNavigation();
         return { success: true, message: 'Navigation paused' };
+      case 'STOP_NAVIGATION':
+        this.stopNavigation();
+        return { success: true, message: 'Navigation stopped' };
       case 'RESUME_NAVIGATION':
         this.resumeNavigation();
         return { success: true, message: 'Navigation resumed' };
@@ -574,25 +704,50 @@ export class SimulationController {
 
   addObstacle(position = null) {
     const currentDest = this.state.currentDestination;
-    const targetX = currentDest ? currentDest.gridPos.x : 16;
-    const targetY = currentDest ? currentDest.gridPos.y : 16;
-    const spawnedGridX = Math.min(19, Math.max(1, Math.round(
-      this.state.robotPosition.grid.x + (targetX - this.state.robotPosition.grid.x) * 0.5
-    )));
-    const spawnedGridY = Math.min(19, Math.max(1, Math.round(
-      this.state.robotPosition.grid.y + (targetY - this.state.robotPosition.grid.y) * 0.5
-    )));
+    const targetX = currentDest ? currentDest.gridPos.x : 10;
+    const targetY = currentDest ? currentDest.gridPos.y : 0;
+    const robotGrid = this.state.robotPosition.grid;
+
+    let spawnedGridX = position?.grid?.x;
+    let spawnedGridY = position?.grid?.y;
+
+    if (spawnedGridX === undefined || spawnedGridY === undefined) {
+      const dx = targetX - robotGrid.x;
+      const dy = targetY - robotGrid.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist <= 2.2) {
+        spawnedGridX = Math.min(18, Math.max(2, robotGrid.x + (dx >= 0 ? 2 : -2)));
+        spawnedGridY = Math.min(18, Math.max(2, robotGrid.y + (dy >= 0 ? 2 : -2)));
+      } else {
+        spawnedGridX = Math.min(18, Math.max(2, Math.round(robotGrid.x + dx * 0.5)));
+        spawnedGridY = Math.min(18, Math.max(2, Math.round(robotGrid.y + dy * 0.5)));
+      }
+
+      if (Math.hypot(spawnedGridX - robotGrid.x, spawnedGridY - robotGrid.y) < 1.4) {
+        spawnedGridX = Math.min(18, Math.max(2, robotGrid.x + (robotGrid.x <= 10 ? 2 : -2)));
+      }
+      if (Math.hypot(spawnedGridX - targetX, spawnedGridY - targetY) < 1.4) {
+        spawnedGridY = Math.min(18, Math.max(2, targetY + (targetY <= 10 ? 2 : -2)));
+      }
+    }
+
     const newObstacle = position || {
       id: `obs-${Date.now()}`,
       grid: { x: spawnedGridX, y: spawnedGridY },
       world: { x: spawnedGridX - 10, y: 0, z: spawnedGridY - 10 },
-      label: `Simulated Hazard [${spawnedGridX}, ${spawnedGridY}]`
+      label: `Road Barricade [${spawnedGridX}, ${spawnedGridY}]`
     };
 
     const updatedObstacles = [...this.state.obstacles, newObstacle];
 
     this.setState({
-      obstacles: updatedObstacles
+      obstacles: updatedObstacles,
+      lastAction: {
+        type: 'obstacle_added',
+        obstacleLabel: newObstacle.label,
+        timestamp: Date.now()
+      }
     });
 
     if (this.engineDelegate?.addObstacle) {
@@ -646,9 +801,15 @@ export class SimulationController {
   }
 
   clearObstacles() {
+    const destName = this.state.currentDestination?.name || 'Library';
     this.setState({
       obstacles: [],
-      isObstacleDetected: false
+      isObstacleDetected: false,
+      lastAction: {
+        type: 'obstacles_cleared',
+        destinationName: destName,
+        timestamp: Date.now()
+      }
     });
 
     if ((this.state.status === 'moving' || this.state.status === 'avoiding_obstacle') && this.state.currentDestination) {
@@ -706,9 +867,24 @@ export class SimulationController {
         const isAtGoal = Boolean(lastWaypoint && this.state.currentDestination &&
           lastWaypoint.x === this.state.currentDestination.gridPos.x &&
           lastWaypoint.y === this.state.currentDestination.gridPos.y);
+        const destName = this.state.currentDestination?.name || 'Library';
+        const targetWorld = this.state.currentDestination?.worldPos || (lastWaypoint ? { x: lastWaypoint.x - 10, y: 0, z: lastWaypoint.y - 10 } : null);
+
         this.setState({
           status: isAtGoal ? 'arrived' : 'no_route',
           progressPercent: isAtGoal ? 100 : this.state.progressPercent,
+          ...(isAtGoal && targetWorld ? {
+            robotPosition: {
+              grid: lastWaypoint,
+              world: targetWorld,
+              heading: this.state.robotPosition.heading
+            }
+          } : {}),
+          lastAction: {
+            type: isAtGoal ? 'arrived' : 'no_route',
+            destinationName: destName,
+            timestamp: Date.now()
+          },
           stats: {
             ...this.state.stats,
             waypointsRemaining: 0
@@ -717,17 +893,59 @@ export class SimulationController {
         return;
       }
 
+      // Skip identical starting waypoint if robot is already at this position
+      if (
+        this.currentWaypointIndex < route.length - 1 &&
+        route[this.currentWaypointIndex].grid.x === this.state.robotPosition.grid.x &&
+        route[this.currentWaypointIndex].grid.y === this.state.robotPosition.grid.y
+      ) {
+        this.currentWaypointIndex++;
+      }
+
       const nextWaypoint = route[this.currentWaypointIndex];
+
+      // Sensor Proximity Check: If obstacle is ahead within sensor range (1.4 units), trigger avoidance!
+      const aheadObstacle = this.state.obstacles.find(obs =>
+        Math.hypot(obs.grid.x - nextWaypoint.grid.x, obs.grid.y - nextWaypoint.grid.y) < 1.4
+      );
+      if (aheadObstacle) {
+        this.checkObstacleCollisionAndReplan(aheadObstacle);
+        return;
+      }
+
       const remaining = route.length - this.currentWaypointIndex - 1;
       const progress = ((this.currentWaypointIndex + 1) / route.length) * 100;
 
       const dx = nextWaypoint.grid.x - this.state.robotPosition.grid.x;
       const dy = nextWaypoint.grid.y - this.state.robotPosition.grid.y;
+      const prevHeading = this.state.robotPosition.heading || 0;
       const headingDeg = (dx !== 0 || dy !== 0)
         ? ((Math.atan2(dy, dx) * 180 / Math.PI) + 90)
-        : (this.state.robotPosition.heading || 0);
+        : prevHeading;
 
-      this.cumulativeDistance += 1.2;
+      // Detect turn maneuver along the route
+      let angleDiff = ((headingDeg - prevHeading + 540) % 360) - 180;
+      let turnAction = null;
+      if (Math.abs(angleDiff) >= 35 && (this.currentWaypointIndex - this.lastTurnWaypointIndex >= 2)) {
+        this.lastTurnWaypointIndex = this.currentWaypointIndex;
+        const turnDir = angleDiff > 0 ? 'right' : 'left';
+        const newCardinal = getHeadingDirection(headingDeg);
+        const pathway = getPathwayName(nextWaypoint.grid.x, nextWaypoint.grid.y);
+        turnAction = {
+          type: 'turn',
+          turn: turnDir,
+          direction: newCardinal,
+          pathway,
+          destinationName: this.state.currentDestination?.name || 'Library',
+          timestamp: Date.now()
+        };
+      }
+
+      // Only increment distance when robot actually moved to a different cell
+      const stepDist = Math.hypot(dx, dy);
+      if (stepDist > 0.01) {
+        this.cumulativeDistance += 1.2;
+      }
       const currentSpeedMps = parseFloat((0.8 * (this.state.speed || 1.0)).toFixed(1));
       const batteryLevel = Math.max(1, Math.round(98 - this.cumulativeDistance * 0.1));
 
@@ -738,6 +956,7 @@ export class SimulationController {
           heading: headingDeg
         },
         progressPercent: progress,
+        ...(turnAction ? { lastAction: turnAction } : {}),
         stats: {
           ...this.state.stats,
           waypointsRemaining: remaining,
@@ -752,68 +971,129 @@ export class SimulationController {
   }
 
   checkObstacleCollisionAndReplan(obstacle) {
-    // Check if new obstacle lies close to remaining waypoints
-    const remainingWaypoints = this.state.activeRoute.slice(this.currentWaypointIndex);
-    const isBlocking = remainingWaypoints.some((wp) => {
-      const dist = Math.hypot(wp.grid.x - obstacle.grid.x, wp.grid.y - obstacle.grid.y);
-      return dist <= 1.5;
+    if (!obstacle || !obstacle.grid) return;
+
+    // Check whether obstacle actually intersects the remaining active route
+    const remainingWaypoints = (this.state.activeRoute || []).slice(this.currentWaypointIndex);
+    const isBlocking = remainingWaypoints.some(wp =>
+      Math.hypot(wp.grid.x - obstacle.grid.x, wp.grid.y - obstacle.grid.y) < 1.35
+    );
+
+    if (!isBlocking) {
+      // Obstacle was placed elsewhere on campus, ignore for replanning
+      return;
+    }
+
+    if (this.movementTimer) {
+      clearInterval(this.movementTimer);
+      this.movementTimer = null;
+    }
+
+    const currentDest = this.state.currentDestination;
+    const destName = currentDest?.name || 'Library';
+    const robotGrid = this.state.robotPosition.grid;
+
+    // Immediately calculate alternate detour path around the obstacle
+    const detour = this.generatePath(
+      robotGrid,
+      currentDest ? currentDest.gridPos : { x: 10, y: 0 },
+      this.state.obstacles
+    );
+
+    let detourTurn = 'right';
+    let detourDir = 'North';
+    let detourPathway = 'Central Plaza Pathway';
+
+    if (detour && detour.length > 1) {
+      const nextStep = detour[1].grid;
+      const vx = obstacle.grid.x - robotGrid.x;
+      const vy = obstacle.grid.y - robotGrid.y;
+      const dx = nextStep.x - robotGrid.x;
+      const dy = nextStep.y - robotGrid.y;
+      const cross = vx * dy - vy * dx;
+      detourTurn = cross > 0 ? 'right' : cross < 0 ? 'left' : (nextStep.x >= obstacle.grid.x ? 'right' : 'left');
+      detourDir = getCardinalDirection(dx, dy);
+      detourPathway = getPathwayName(nextStep.x, nextStep.y);
+    }
+
+    this.setState({
+      status: 'avoiding_obstacle',
+      isObstacleDetected: true,
+      blockedObstacle: obstacle,
+      detourInfo: {
+        turn: detourTurn,
+        pathway: detourPathway,
+        direction: detourDir
+      },
+      lastAction: {
+        type: 'obstacle_detected',
+        obstacleLabel: obstacle.label || 'Road Barricade',
+        destinationName: destName,
+        detourTurn,
+        detourPathway,
+        detourDir,
+        timestamp: Date.now()
+      }
     });
 
-    if (isBlocking) {
-      if (this.movementTimer) {
-        clearInterval(this.movementTimer);
-        this.movementTimer = null;
-      }
+    if (this.replanTimeout) {
+      clearTimeout(this.replanTimeout);
+      this.replanTimeout = null;
+    }
 
-      this.setState({
-        status: 'avoiding_obstacle',
-        isObstacleDetected: true
-      });
+    // After brief moment to observe hazard, execute the alternate detour
+    this.replanTimeout = setTimeout(() => {
+      this.replanTimeout = null;
 
-      if (this.replanTimeout) {
-        clearTimeout(this.replanTimeout);
-        this.replanTimeout = null;
-      }
-
-      // Recalculate detour
-      this.replanTimeout = setTimeout(() => {
-        this.replanTimeout = null;
-
-        const detour = this.generatePath(
-          this.state.robotPosition.grid,
-          this.state.currentDestination.gridPos,
-          this.state.obstacles
-        );
-
-        if (!detour || detour.length === 0) {
-          this.setState({
-            status: 'no_route',
-            isObstacleDetected: false
-          });
-          return;
-        }
-
-        this.currentWaypointIndex = 0;
+      if (!detour || detour.length === 0) {
         this.setState({
-          status: 'moving',
+          status: 'no_route',
           isObstacleDetected: false,
-          activeRoute: detour,
-          stats: {
-            ...this.state.stats,
-            totalWaypoints: detour.length,
-            waypointsRemaining: detour.length
+          lastAction: {
+            type: 'no_route',
+            destinationName: destName,
+            timestamp: Date.now()
           }
         });
+        return;
+      }
 
-        this.startMovementTicker();
-      }, 1400);
-    }
+      // Detour route begins at robot's current position; slice off starting point so nextWaypoint is the step avoiding the obstacle
+      const cleanRoute = (detour.length > 1 && detour[0].grid.x === robotGrid.x && detour[0].grid.y === robotGrid.y)
+        ? detour.slice(1)
+        : detour;
+
+      this.currentWaypointIndex = 0;
+      this.lastTurnWaypointIndex = 0;
+      this.setState({
+        status: 'moving',
+        isObstacleDetected: false,
+        activeRoute: cleanRoute,
+        lastAction: {
+          type: 'alternate_route',
+          obstacleLabel: obstacle.label || 'Road Barricade',
+          destinationName: destName,
+          detourTurn,
+          detourPathway,
+          detourDir,
+          timestamp: Date.now()
+        },
+        stats: {
+          ...this.state.stats,
+          totalWaypoints: cleanRoute.length,
+          waypointsRemaining: cleanRoute.length
+        }
+      });
+
+      this.startMovementTicker();
+    }, 1200);
   }
 
   // Pathfinding algorithm generating collision-free waypoints
   generatePath(start, goal, obstacles) {
     const isBlocked = (gx, gy) => {
       if (gx < 0 || gx > 20 || gy < 0 || gy > 20) return true;
+      if (gx === start.x && gy === start.y) return false;
       return obstacles.some(obs => Math.hypot(obs.grid.x - gx, obs.grid.y - gy) < 1.3);
     };
     if (isBlocked(goal.x, goal.y)) return null;

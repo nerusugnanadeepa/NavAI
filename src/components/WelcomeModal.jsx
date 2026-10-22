@@ -44,7 +44,7 @@ export function WelcomeModal({ isOpen, onClose }) {
         <div className="space-y-2 mb-6 text-xs text-slate-300">
           <div className="flex items-start gap-2.5 p-2 rounded-lg bg-slate-900/60 border border-slate-700/50">
             <MapPin size={16} className="text-blue-400 mt-0.5 flex-shrink-0" />
-            <span><strong>1. Select Destination:</strong> Choose Library, Classroom, Cafeteria, or Main Gate.</span>
+            <span><strong>1. Select Destination:</strong> Choose Library, Computer Lab, Cafeteria, Auditorium, or Main Gate.</span>
           </div>
 
           <div className="flex items-start gap-2.5 p-2 rounded-lg bg-slate-900/60 border border-slate-700/50">

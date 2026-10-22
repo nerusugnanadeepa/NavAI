@@ -1,4 +1,4 @@
-import { SUPPORTED_LANGUAGES, LANGUAGE_UI_TEXTS } from './languages';
+import { SUPPORTED_LANGUAGES, LANGUAGE_UI_TEXTS, translateDirection, translateTurn } from './languages';
 
 class SpeechOutputEngine {
   constructor() {
@@ -78,56 +78,133 @@ class SpeechOutputEngine {
     }
   }
 
-  // Multilingual voice announcements
-  speakNavStarted(destinationName) {
-    const text = this.getTexts().speech.navStarted(destinationName);
-    this.speak(text, true);
-  }
-
-  speakObstacleDetected(destinationName = 'Library', direction = 'right') {
-    const speechFn = this.getTexts().speech.obstacleDetected;
-    const text = typeof speechFn === 'function' ? speechFn(destinationName, direction) : 'Obstacle ahead. Recalculating route.';
+  // Multilingual voice announcements with direction & detour details
+  speakNavStarted(destinationName, direction = 'North', location = 'Campus Dock') {
+    const speechFn = this.getTexts().speech?.navStarted;
+    const translatedDir = translateDirection(direction, this.currentLang);
+    const text = typeof speechFn === 'function'
+      ? speechFn(destinationName, translatedDir, location)
+      : `Navigation started towards ${destinationName}. Heading ${translatedDir} from ${location}.`;
     this.speak(text, true);
     return text;
   }
 
-  speakTurnGuidance(direction = 'right', landmark = 'Library') {
-    const speechFn = this.getTexts().speech.turnGuidance;
-    const text = typeof speechFn === 'function' ? speechFn(direction, landmark) : `Turn ${direction} towards ${landmark}.`;
+  speakObstacleDetected(obstacleLabel = 'Road Barricade', destinationName = 'Library', detourDir = 'right', pathway = 'East Pathway', direction = 'North') {
+    const speechFn = this.getTexts().speech?.obstacleDetected;
+    const translatedDetour = translateTurn(detourDir, this.currentLang);
+    const translatedDir = translateDirection(direction, this.currentLang);
+    const text = typeof speechFn === 'function'
+      ? speechFn(obstacleLabel, destinationName, translatedDetour, pathway, translatedDir)
+      : `Obstacle detected ahead: ${obstacleLabel} is blocking the direct path to ${destinationName}! Recalculating alternate route.`;
+    this.speak(text, true);
+    return text;
+  }
+
+  speakAlternateRoute(detourDir = 'right', pathway = 'East Pathway', destinationName = 'Library', direction = 'North') {
+    const speechFn = this.getTexts().speech?.alternateRoute;
+    const translatedDetour = translateTurn(detourDir, this.currentLang);
+    const translatedDir = translateDirection(direction, this.currentLang);
+    const text = typeof speechFn === 'function'
+      ? speechFn(translatedDetour, pathway, destinationName, translatedDir)
+      : `Taking alternate route: turning ${translatedDetour} via ${pathway} heading ${translatedDir} towards ${destinationName}.`;
+    this.speak(text, true);
+    return text;
+  }
+
+  speakTurnGuidance(turnDir = 'right', newDir = 'North', pathway = 'Campus Walkway', destinationName = 'Library') {
+    const speechFn = this.getTexts().speech?.turnGuidance;
+    const translatedTurn = translateTurn(turnDir, this.currentLang);
+    const translatedDir = translateDirection(newDir, this.currentLang);
+    const text = typeof speechFn === 'function'
+      ? speechFn(translatedTurn, translatedDir, pathway, destinationName)
+      : `Turning ${translatedTurn} onto ${pathway}, heading ${translatedDir} towards ${destinationName}.`;
     this.speak(text, false);
     return text;
   }
 
-  speakRouteRecalculated(destinationName = 'Library') {
-    const speechFn = this.getTexts().speech.routeRecalculated;
-    const text = typeof speechFn === 'function' ? speechFn(destinationName) : 'Alternative route calculated.';
+  speakManualMove(action = 'forward', direction = 'North') {
+    const speechFn = this.getTexts().speech?.manualMove;
+    const translatedDir = translateDirection(direction, this.currentLang);
+    const text = typeof speechFn === 'function'
+      ? speechFn(action, translatedDir)
+      : (action === 'backward' ? 'Moving backward in reverse.' : `Moving forward 1 step, heading ${translatedDir}.`);
+    this.speak(text, true);
+    return text;
+  }
+
+  speakManualTurn(turnDir = 'right', newDir = 'North') {
+    const speechFn = this.getTexts().speech?.manualTurn;
+    const translatedTurn = translateTurn(turnDir, this.currentLang);
+    const translatedDir = translateDirection(newDir, this.currentLang);
+    const text = typeof speechFn === 'function'
+      ? speechFn(translatedTurn, translatedDir)
+      : `Turned ${translatedTurn} 90 degrees. Robot is now facing ${translatedDir}.`;
+    this.speak(text, true);
+    return text;
+  }
+
+  speakObstacleBlockedMove() {
+    const speechFn = this.getTexts().speech?.obstacleBlockedMove;
+    const text = typeof speechFn === 'function'
+      ? speechFn()
+      : 'Cannot move forward: obstacle detected directly ahead!';
+    this.speak(text, true);
+    return text;
+  }
+
+  speakObstacleAdded(label = 'Hazard') {
+    const speechFn = this.getTexts().speech?.obstacleAdded;
+    const text = typeof speechFn === 'function'
+      ? speechFn(label)
+      : `Obstacle placed: ${label} on campus grid. Scanning path for conflicts.`;
+    this.speak(text, true);
+    return text;
+  }
+
+  speakObstaclesCleared(destinationName = 'Library') {
+    const speechFn = this.getTexts().speech?.obstaclesCleared;
+    const text = typeof speechFn === 'function'
+      ? speechFn(destinationName)
+      : `Obstacles cleared. Resuming direct optimal path towards ${destinationName}.`;
     this.speak(text, true);
     return text;
   }
 
   speakDestinationReached(destinationName) {
-    const text = this.getTexts().speech.destinationReached(destinationName);
+    const speechFn = this.getTexts().speech?.destinationReached;
+    const text = typeof speechFn === 'function'
+      ? speechFn(destinationName)
+      : `Destination reached: You have safely arrived at ${destinationName}! Navigation completed successfully.`;
     this.speak(text, true);
+    return text;
   }
 
   speakNoRoute() {
     const text = this.getTexts().speech.noRoute();
     this.speak(text, true);
+    return text;
   }
 
   speakPaused() {
     const text = this.getTexts().speech.paused();
-    this.speak(text);
+    this.speak(text, true);
+    return text;
   }
 
-  speakResumed() {
-    const text = this.getTexts().speech.resumed();
-    this.speak(text);
+  speakResumed(destinationName = 'Destination', direction = 'North') {
+    const speechFn = this.getTexts().speech?.resumed;
+    const translatedDir = translateDirection(direction, this.currentLang);
+    const text = typeof speechFn === 'function'
+      ? speechFn(destinationName, translatedDir)
+      : `Navigation resumed towards ${destinationName}, heading ${translatedDir}.`;
+    this.speak(text, true);
+    return text;
   }
 
   speakSimulationReset() {
     const text = this.getTexts().speech.reset();
-    this.speak(text);
+    this.speak(text, true);
+    return text;
   }
 }
 

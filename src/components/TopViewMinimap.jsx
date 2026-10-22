@@ -6,7 +6,8 @@ export function TopViewMinimap({
   currentDestination,
   obstacles,
   activeRoute,
-  status
+  status,
+  blockedObstacle
 }) {
   // Grid size 20x20 mapped to 100x100 viewBox
   const toSvg = (grid) => ({
@@ -55,9 +56,8 @@ export function TopViewMinimap({
             <line x1="50" y1="50" x2="82" y2="80" />
           </g>
 
-          {/* Central Fountain Pool */}
-          <circle cx="50" cy="50" r="7" fill="#38bdf8" stroke="#d5cebf" strokeWidth="1.5" />
-          <circle cx="50" cy="50" r="2.5" fill="#bae6fd" />
+          {/* Central Sandstone Plaza Junction */}
+          <circle cx="50" cy="50" r="5.5" fill="#d5cebf" />
 
           {/* Building Outlines & Labels */}
           {/* Library (Top) */}
@@ -93,8 +93,14 @@ export function TopViewMinimap({
 
           {/* Dynamic Blocked Red Dashed Trajectory Line leading to obstacle only when avoiding obstacle */}
           {status === 'avoiding_obstacle' && obstacles && obstacles.length > 0 && (() => {
-            const nearestObs = obstacles[obstacles.length - 1];
-            const obsPt = toSvg(nearestObs.grid || nearestObs);
+            const robotGrid = robotPosition?.grid || { x: 5, y: 14 };
+            const targetObs = blockedObstacle || [...obstacles].sort((a, b) => {
+              const da = Math.hypot((a.grid?.x ?? a.x) - robotGrid.x, (a.grid?.y ?? a.y) - robotGrid.y);
+              const db = Math.hypot((b.grid?.x ?? b.x) - robotGrid.x, (b.grid?.y ?? b.y) - robotGrid.y);
+              return da - db;
+            })[0];
+            if (!targetObs) return null;
+            const obsPt = toSvg(targetObs.grid || targetObs);
             return (
               <line
                 x1={robotPt.x}

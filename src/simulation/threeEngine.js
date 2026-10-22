@@ -22,7 +22,8 @@ export class ThreeEngine {
     this.povCamera = null;
     this.renderer = null;
     this.povRenderer = null;
-    this.povCanvas = null;
+    this.povOffscreenCanvas = null;
+    this.attachedPovCanvases = new Set();
     this.controls = null;
     this.clock = new THREE.Clock();
     this.animationFrameId = null;
@@ -47,9 +48,7 @@ export class ThreeEngine {
     this.lidarPuck = null;
     this.robotWheels = [];
     this.hoverPreviewMesh = null;
-    this.fountainParticles = [];
     this.pedestrians = [];
-    this.fountainWater = null;
 
     // Animation / State Interpolation
     this.robotTargetPos = new THREE.Vector3(-5, 0, 5.5);
@@ -102,9 +101,8 @@ export class ThreeEngine {
     // 5. Lighting (Warm sun and sky light)
     this.setupLighting();
 
-    // 6. Ground, Plaza, Pathways & Water Fountain
+    // 6. Ground, Plaza & Pathways
     this.setupEnvironment();
-    this.setupFountain();
 
     // 7. Campus Buildings with 3D Signboards
     this.setupBuildings();
@@ -433,99 +431,7 @@ export class ThreeEngine {
     this.scene.add(this.pathChevronsGroup);
   }
 
-  setupFountain() {
-    const fountainGroup = new THREE.Group();
-    fountainGroup.position.set(0, 0, -1);
-
-    const stoneMat = new THREE.MeshStandardMaterial({
-      color: 0xd6ccc2,
-      roughness: 0.52,
-      metalness: 0.12
-    });
-
-    // 1. Lower circular pool basin rim
-    const basinGeo = new THREE.CylinderGeometry(2.35, 2.5, 0.45, 36);
-    const basin = new THREE.Mesh(basinGeo, stoneMat);
-    basin.position.y = 0.225;
-    basin.castShadow = true;
-    basin.receiveShadow = true;
-    fountainGroup.add(basin);
-
-    // Stone decorative lip torus
-    const lipGeo = new THREE.TorusGeometry(2.4, 0.12, 12, 36);
-    const lip = new THREE.Mesh(lipGeo, stoneMat);
-    lip.rotation.x = Math.PI / 2;
-    lip.position.y = 0.46;
-    lip.castShadow = true;
-    fountainGroup.add(lip);
-
-    // 2. Clear Shimmering Cyan Pool Water
-    const waterGeo = new THREE.CircleGeometry(2.3, 36);
-    const waterMat = new THREE.MeshStandardMaterial({
-      color: 0x06b6d4, // Vibrant cyan turquoise
-      roughness: 0.08,
-      metalness: 0.25,
-      transparent: true,
-      opacity: 0.88
-    });
-    this.fountainWater = new THREE.Mesh(waterGeo, waterMat);
-    this.fountainWater.rotation.x = -Math.PI / 2;
-    this.fountainWater.position.y = 0.38;
-    fountainGroup.add(this.fountainWater);
-
-    // 3. Central Fountain Pedestal
-    const pedGeo = new THREE.CylinderGeometry(0.5, 0.7, 0.85, 20);
-    const ped = new THREE.Mesh(pedGeo, stoneMat);
-    ped.position.y = 0.45 + 0.425;
-    ped.castShadow = true;
-    fountainGroup.add(ped);
-
-    // 4. Upper Water Basin Bowl
-    const bowlGeo = new THREE.CylinderGeometry(1.05, 0.6, 0.32, 24);
-    const bowl = new THREE.Mesh(bowlGeo, stoneMat);
-    bowl.position.y = 1.3 + 0.16;
-    bowl.castShadow = true;
-    fountainGroup.add(bowl);
-
-    // Upper pool water
-    const upperWaterGeo = new THREE.CircleGeometry(1.0, 24);
-    const upperWater = new THREE.Mesh(upperWaterGeo, waterMat);
-    upperWater.rotation.x = -Math.PI / 2;
-    upperWater.position.y = 1.62;
-    fountainGroup.add(upperWater);
-
-    // Center Spout Nozzle
-    const spoutGeo = new THREE.CylinderGeometry(0.12, 0.18, 0.45, 16);
-    const spout = new THREE.Mesh(spoutGeo, stoneMat);
-    spout.position.y = 1.62 + 0.225;
-    spout.castShadow = true;
-    fountainGroup.add(spout);
-
-    // 5. Animated Splashing Water Particles (Center jet + Cascading arcs)
-    this.fountainParticles = [];
-    const particleCount = 56;
-    const particleGeo = new THREE.SphereGeometry(0.045, 8, 8);
-    const particleMat = new THREE.MeshBasicMaterial({
-      color: 0xe0f2fe,
-      transparent: true,
-      opacity: 0.92
-    });
-
-    for (let i = 0; i < particleCount; i++) {
-      const p = new THREE.Mesh(particleGeo, particleMat);
-      const angle = (i / particleCount) * Math.PI * 2;
-      p.userData = {
-        angle,
-        speed: 0.7 + (i % 5) * 0.18,
-        progress: (i / particleCount),
-        radiusMax: 0.5 + (i % 3) * 0.4
-      };
-      fountainGroup.add(p);
-      this.fountainParticles.push(p);
-    }
-
-    this.scene.add(fountainGroup);
-  }
+  setupFountain() {}
 
   createSignboardMesh(text, width = 2.4, height = 0.55) {
     const group = new THREE.Group();
@@ -1457,39 +1363,44 @@ export class ThreeEngine {
     }
   }
 
-  attachPovCanvas(canvas) {
-    if (!canvas) {
-      if (this.povRenderer) {
-        this.povRenderer.dispose();
-        this.povRenderer = null;
-      }
-      this.povCanvas = null;
-      return;
-    }
-    this.povCanvas = canvas;
+  initPovRenderer() {
+    if (this.povRenderer) return;
     try {
-      if (this.povRenderer) {
-        this.povRenderer.dispose();
-      }
+      this.povOffscreenCanvas = document.createElement('canvas');
+      this.povOffscreenCanvas.width = 480;
+      this.povOffscreenCanvas.height = 270;
       this.povRenderer = new THREE.WebGLRenderer({
-        canvas,
+        canvas: this.povOffscreenCanvas,
         antialias: true,
         alpha: false,
         powerPreference: 'high-performance'
       });
-      const width = canvas.clientWidth || 280;
-      const height = canvas.clientHeight || 155;
-      this.povRenderer.setSize(width, height, false);
-      this.povRenderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      this.povRenderer.setSize(480, 270, false);
+      this.povRenderer.setPixelRatio(1);
       this.povRenderer.toneMapping = THREE.ACESFilmicToneMapping;
       this.povRenderer.toneMappingExposure = 1.15;
 
       if (this.povCamera) {
-        this.povCamera.aspect = width / height;
+        this.povCamera.aspect = 480 / 270;
         this.povCamera.updateProjectionMatrix();
       }
     } catch (e) {
-      console.warn('Could not attach POV canvas to ThreeEngine:', e);
+      console.warn('Could not initialize POV offscreen renderer:', e);
+    }
+  }
+
+  attachPovCanvas(canvas) {
+    if (!this.attachedPovCanvases) {
+      this.attachedPovCanvases = new Set();
+    }
+    if (!canvas) return;
+    this.attachedPovCanvases.add(canvas);
+    this.initPovRenderer();
+  }
+
+  detachPovCanvas(canvas) {
+    if (this.attachedPovCanvases && canvas) {
+      this.attachedPovCanvases.delete(canvas);
     }
   }
 
@@ -1509,14 +1420,9 @@ export class ThreeEngine {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
 
-    if (this.povCanvas && this.povRenderer && this.povCamera) {
-      const pWidth = this.povCanvas.clientWidth || 280;
-      const pHeight = this.povCanvas.clientHeight || 155;
-      if (pWidth > 0 && pHeight > 0) {
-        this.povCamera.aspect = pWidth / pHeight;
-        this.povCamera.updateProjectionMatrix();
-        this.povRenderer.setSize(pWidth, pHeight, false);
-      }
+    if (this.povRenderer && this.povCamera) {
+      this.povCamera.aspect = 480 / 270;
+      this.povCamera.updateProjectionMatrix();
     }
   }
 
@@ -1631,26 +1537,7 @@ export class ThreeEngine {
       }
     }
 
-    // 2. Animate Water Fountain Spray Particles & Water Surface Ripples
-    if (this.fountainParticles.length > 0) {
-      this.fountainParticles.forEach((p) => {
-        p.userData.progress += delta * p.userData.speed;
-        if (p.userData.progress > 1.0) p.userData.progress = 0;
-
-        const t = p.userData.progress;
-        // Parabolic arc: rise then fall
-        const y = 1.95 + Math.sin(t * Math.PI) * 1.1;
-        const r = t * p.userData.radiusMax;
-        const x = Math.cos(p.userData.angle) * r;
-        const z = Math.sin(p.userData.angle) * r;
-        p.position.set(x, y, z);
-      });
-    }
-
-    if (this.fountainWater) {
-      const ripple = 1.0 + Math.sin(elapsedTime * 3.0) * 0.015;
-      this.fountainWater.scale.set(ripple, ripple, 1);
-    }
+    // (Fountain animation removed - plaza center is clear)
 
     // 3. Animate Obstacle Alert Badges
     this.obstacleMeshes.forEach((mesh) => {
@@ -1702,9 +1589,29 @@ export class ThreeEngine {
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
 
-    // 6. Render live onboard POV camera feed for Camera View HUD card
-    if (this.povRenderer && this.povCamera && this.scene) {
+    // 6. Render live onboard POV camera feed for Camera View HUD card(s)
+    if (this.attachedPovCanvases && this.attachedPovCanvases.size > 0 && this.povRenderer && this.povCamera && this.scene) {
       this.povRenderer.render(this.scene, this.povCamera);
+      for (const targetCanvas of this.attachedPovCanvases) {
+        if (!targetCanvas || !targetCanvas.isConnected) {
+          this.attachedPovCanvases.delete(targetCanvas);
+          continue;
+        }
+        try {
+          const w = targetCanvas.clientWidth || targetCanvas.width || 320;
+          const h = targetCanvas.clientHeight || targetCanvas.height || 180;
+          if (w > 0 && h > 0 && (targetCanvas.width !== w || targetCanvas.height !== h)) {
+            targetCanvas.width = w;
+            targetCanvas.height = h;
+          }
+          const ctx = targetCanvas.getContext('2d');
+          if (ctx && targetCanvas.width > 0 && targetCanvas.height > 0) {
+            ctx.drawImage(this.povOffscreenCanvas, 0, 0, targetCanvas.width, targetCanvas.height);
+          }
+        } catch (e) {
+          // Ignore blit errors on unrendered/hidden canvases
+        }
+      }
     }
   }
 
@@ -1779,7 +1686,10 @@ export class ThreeEngine {
       this.povRenderer.dispose();
       this.povRenderer = null;
     }
-    this.povCanvas = null;
+    if (this.attachedPovCanvases) {
+      this.attachedPovCanvases.clear();
+    }
+    this.povOffscreenCanvas = null;
 
     // Detach from simulation controller (Bug 2.8 fix)
     simulationController.detachEngine(this);
