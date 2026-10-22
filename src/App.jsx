@@ -25,14 +25,13 @@ import { DestinationSelector } from './components/DestinationSelector';
 import { WelcomeModal } from './components/WelcomeModal';
 import { CommandBar } from './components/CommandBar';
 import { MobileTopBar } from './components/MobileTopBar';
-import { MobileDrawer } from './components/MobileDrawer';
 import { MobileBottomCockpit } from './components/MobileBottomCockpit';
 import { MobilePipWidget } from './components/MobilePipWidget';
 import { useSimulation } from './hooks/useSimulation';
 import { speechOutput } from './voice/speechOutput';
 import { speechInput } from './voice/speechInput';
 import { SUPPORTED_LANGUAGES, LANGUAGE_UI_TEXTS } from './voice/languages';
-import { simulationController } from './simulation/simulationController';
+import { simulationController, getHeadingDirection } from './simulation/simulationController';
 import { X, HelpCircle, Volume2, VolumeX } from 'lucide-react';
 import './App.css';
 
@@ -71,7 +70,6 @@ export function App() {
   const [isVoiceListening, setIsVoiceListening] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [showDestinationsModal, setShowDestinationsModal] = useState(false);
-  const [showMobileDrawer, setShowMobileDrawer] = useState(false);
   const [activeTab, setActiveTab] = useState('map');
   const [cameraMode, setCameraMode] = useState('perspective');
   const [guidanceText, setGuidanceText] = useState(
@@ -207,30 +205,39 @@ export function App() {
   };
 
   // Handle Start (Bug 1.1 Fix: use user's selected destination, not hardcoded 'library')
-  const handleStartNavigation = () => {
+  const handleStartNavigation = useCallback(() => {
     const destId = currentDestination?.id || 'library';
     if (!currentDestination) {
       selectDestination(destId);
     }
     startNavigation(destId);
-  };
+  }, [currentDestination, selectDestination, startNavigation]);
 
   // Handle Stop (Bug 3.3 Fix: actually stop navigation and cancel route)
-  const handleStopNavigation = () => {
+  const handleStopNavigation = useCallback(() => {
     stopNavigation();
     speechOutput.speakPaused();
     setGuidanceText('Navigation stopped. Standing by.');
-  };
+  }, [stopNavigation]);
 
   // Handle Reset
-  const handleResetSimulation = () => {
+  const handleResetSimulation = useCallback(() => {
     resetSimulation();
     speechOutput.speakSimulationReset();
-    setGuidanceText('Simulation reset. Standing by for destination selection.');
-  };
+  }, [resetSimulation]);
 
-  // Handle Voice / Command execution across all 6 languages
-  const handleVoiceCommand = (command, transcript) => {
+  // Link speech output with speech input for hands-free conversation
+  useEffect(() => {
+    speechOutput.onSpeechStart = () => {
+      speechInput.pauseForSpeech(true);
+    };
+    speechOutput.onSpeechEnd = () => {
+      speechInput.pauseForSpeech(false);
+    };
+  }, []);
+
+  // Handle Voice / Conversational Command execution across all 6 languages
+  const handleVoiceCommand = useCallback((command, transcript) => {
     let cmd = command;
     if (typeof command === 'string') {
       cmd = speechInput.parseCommand(command);
@@ -238,6 +245,26 @@ export function App() {
     if (!cmd) return;
 
     switch (cmd.type) {
+      case 'GREETING': {
+        const text = speechOutput.speakGreeting();
+        setGuidanceText(text);
+        break;
+      }
+      case 'STATUS_QUERY': {
+        const text = speechOutput.speakStatus(locDescription, status, currentDestination?.name);
+        setGuidanceText(text);
+        break;
+      }
+      case 'IDENTITY_QUERY': {
+        const text = speechOutput.speakIdentity();
+        setGuidanceText(text);
+        break;
+      }
+      case 'HELP_QUERY': {
+        const text = speechOutput.speakHelp();
+        setGuidanceText(text);
+        break;
+      }
       case 'NAVIGATE_TO':
       case 'SELECT_DESTINATION': {
         const dest = selectDestination(cmd.destinationId);
@@ -247,50 +274,113 @@ export function App() {
         break;
       }
       case 'MOVE_FORWARD': {
-        moveForward();
+        moveForward(cmd.steps || 1);
+        const headingDir = robotPosition?.heading !== undefined ? getHeadingDirection(robotPosition.heading) : 'North';
+        const text = speechOutput.speakManualMove('forward', headingDir);
+        setGuidanceText(text);
         break;
       }
       case 'MOVE_BACKWARD': {
-        moveBackward();
+        moveBackward(cmd.steps || 1);
+        const text = speechOutput.speakManualMove('backward', 'South');
+        setGuidanceText(text);
         break;
       }
-      case 'TURN_LEFT':
+      case 'TURN_LEFT': {
         turnLeft();
+        const nextHeading = ((robotPosition?.heading || 0) - 90 + 360) % 360;
+        const text = speechOutput.speakManualTurn('left', getHeadingDirection(nextHeading));
+        setGuidanceText(text);
         break;
-      case 'TURN_RIGHT':
+      }
+      case 'TURN_RIGHT': {
         turnRight();
+        const nextHeading = ((robotPosition?.heading || 0) + 90) % 360;
+        const text = speechOutput.speakManualTurn('right', getHeadingDirection(nextHeading));
+        setGuidanceText(text);
         break;
-      case 'SPEED_UP':
-        setSpeed(Math.min(3.0, (speed || 1.0) + 0.5));
+      }
+      case 'SPEED_UP': {
+        const newSpeed = Math.min(3.0, (speed || 1.0) + 0.5);
+        setSpeed(newSpeed);
+        const text = speechOutput.speakSpeedChanged(newSpeed);
+        setGuidanceText(text);
         break;
-      case 'SLOW_DOWN':
-        setSpeed(Math.max(0.5, (speed || 1.0) - 0.5));
+      }
+      case 'SLOW_DOWN': {
+        const newSpeed = Math.max(0.5, (speed || 1.0) - 0.5);
+        setSpeed(newSpeed);
+        const text = speechOutput.speakSpeedChanged(newSpeed);
+        setGuidanceText(text);
         break;
-      case 'START_NAVIGATION':
+      }
+      case 'START_NAVIGATION': {
         handleStartNavigation();
         break;
-      case 'PAUSE_NAVIGATION':
+      }
+      case 'PAUSE_NAVIGATION': {
         pauseNavigation();
+        const text = speechOutput.speakPaused();
+        setGuidanceText(text);
         break;
-      case 'STOP_NAVIGATION':
+      }
+      case 'STOP_NAVIGATION': {
         handleStopNavigation();
+        const text = speechOutput.speakStopped();
+        setGuidanceText(text);
         break;
-      case 'RESUME_NAVIGATION':
+      }
+      case 'RESUME_NAVIGATION': {
         resumeNavigation();
+        const text = speechOutput.speakResumed(currentDestination?.name || 'Destination');
+        setGuidanceText(text);
         break;
-      case 'RESET_SIMULATION':
+      }
+      case 'RESET_SIMULATION': {
         handleResetSimulation();
         break;
-      case 'ADD_OBSTACLE':
+      }
+      case 'ADD_OBSTACLE': {
         addObstacle();
+        const text = speechOutput.speakObstacleAdded('Road Barricade');
+        setGuidanceText(text);
         break;
-      case 'REMOVE_OBSTACLE':
+      }
+      case 'REMOVE_OBSTACLE': {
         clearObstacles();
+        const text = speechOutput.speakObstaclesCleared(currentDestination?.name || 'Library');
+        setGuidanceText(text);
         break;
-      default:
+      }
+      default: {
+        if (transcript || cmd.raw) {
+          const text = speechOutput.speakUnknown(transcript || cmd.raw);
+          setGuidanceText(text);
+        }
         break;
+      }
     }
-  };
+  }, [
+    selectDestination,
+    startNavigation,
+    moveForward,
+    moveBackward,
+    turnLeft,
+    turnRight,
+    speed,
+    setSpeed,
+    pauseNavigation,
+    resumeNavigation,
+    addObstacle,
+    clearObstacles,
+    locDescription,
+    status,
+    currentDestination,
+    robotPosition,
+    handleStartNavigation,
+    handleStopNavigation,
+    handleResetSimulation
+  ]);
 
   const handleSelectLanguage = (langCode) => {
     setCurrentLanguage(langCode);
@@ -305,27 +395,65 @@ export function App() {
   };
 
   const handleToggleVoiceListening = useCallback(() => {
-    if (isVoiceListening) {
-      speechInput.stopListening();
-      setIsVoiceListening(false);
-    } else {
-      speechInput.setLanguage(currentLanguage);
-      const started = speechInput.startListening(
+    const nextActive = !isVoiceListening;
+    setIsVoiceListening(nextActive);
+    speechInput.setLanguage(currentLanguage);
+    speechInput.setActiveConversationMode(
+      nextActive,
+      ({ transcript, command }) => {
+        handleVoiceCommand(command, transcript);
+      },
+      ({ state }) => {
+        setIsVoiceListening(state === 'listening' || state === 'speaking' || state === 'processing' || speechInput.activeMode);
+      },
+      (error) => {
+        console.warn('Voice listening error:', error);
+      }
+    );
+
+    if (nextActive) {
+      const greeting = speechOutput.speakGreeting();
+      setGuidanceText(greeting);
+    }
+  }, [isVoiceListening, currentLanguage, handleVoiceCommand]);
+
+  // Auto-activate voice assistant on load so it stays active and converses continuously
+  useEffect(() => {
+    speechInput.setLanguage(currentLanguage);
+    const activate = () => {
+      speechInput.setActiveConversationMode(
+        true,
         ({ transcript, command }) => {
-          setIsVoiceListening(false);
           handleVoiceCommand(command, transcript);
         },
         ({ state }) => {
-          setIsVoiceListening(state === 'listening' || state === 'speaking' || state === 'processing');
+          setIsVoiceListening(state === 'listening' || state === 'speaking' || state === 'processing' || speechInput.activeMode);
         },
         (error) => {
-          setIsVoiceListening(false);
-          console.warn('Voice listening error:', error);
+          console.log('Voice standby notice:', error);
         }
       );
-      if (started) setIsVoiceListening(true);
-    }
-  }, [isVoiceListening, currentLanguage, handleVoiceCommand]);
+      setIsVoiceListening(true);
+    };
+
+    activate();
+
+    const handleUserGesture = () => {
+      if (!speechInput.activeMode) {
+        activate();
+      }
+      window.removeEventListener('click', handleUserGesture);
+      window.removeEventListener('touchstart', handleUserGesture);
+    };
+
+    window.addEventListener('click', handleUserGesture);
+    window.addEventListener('touchstart', handleUserGesture);
+
+    return () => {
+      window.removeEventListener('click', handleUserGesture);
+      window.removeEventListener('touchstart', handleUserGesture);
+    };
+  }, [currentLanguage, handleVoiceCommand]);
 
   const handleToggleMute = () => {
     const next = !isMuted;
@@ -448,6 +576,7 @@ export function App() {
             status={status}
             currentDestination={currentDestination}
             onCommandRecognized={handleVoiceCommand}
+            isListeningExternal={isVoiceListening}
           />
         </div>
       </div>
@@ -461,7 +590,6 @@ export function App() {
           onSelectLanguage={handleSelectLanguage}
           isMuted={isMuted}
           onToggleMute={handleToggleMute}
-          onOpenDrawer={() => setShowMobileDrawer(true)}
           onOpenDestinations={() => setShowDestinationsModal(true)}
           onOpenHelp={() => setShowWelcome(true)}
           distanceLeft={distanceLeft}
@@ -509,28 +637,7 @@ export function App() {
           locationDescription={locDescription}
           distanceLeft={distanceLeft}
           speedStr={speedStr}
-        />
-
-        <MobileDrawer
-          isOpen={showMobileDrawer}
-          onClose={() => setShowMobileDrawer(false)}
-          status={status}
-          currentDestination={currentDestination}
-          onSelectDestination={handleSelectDestination}
-          onStart={handleStartNavigation}
-          onPause={pauseNavigation}
-          onResume={resumeNavigation}
-          onStop={handleStopNavigation}
-          onReset={handleResetSimulation}
-          cameraMode={cameraMode}
-          onSetCameraMode={setCameraMode}
-          speed={speed}
-          onSetSpeed={setSpeed}
-          onAddObstacle={() => addObstacle()}
-          onClearObstacles={clearObstacles}
-          currentLanguage={currentLanguage}
-          onSelectLanguage={handleSelectLanguage}
-          onOpenHelp={() => setShowWelcome(true)}
+          isListeningExternal={isVoiceListening}
         />
       </div>
 

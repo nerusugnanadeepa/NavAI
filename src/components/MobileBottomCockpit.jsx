@@ -56,7 +56,8 @@ export function MobileBottomCockpit({
   onTurnRight,
   locationDescription,
   distanceLeft,
-  speedStr
+  speedStr,
+  isListeningExternal
 }) {
   const [activeSheetTab, setActiveSheetTab] = useState(null); // null | 'controls' | 'status' | 'map' | 'camera' | 'voice'
   const [isListening, setIsListening] = useState(false);
@@ -64,20 +65,23 @@ export function MobileBottomCockpit({
   const isMoving = status === 'moving' || status === 'avoiding_obstacle';
   const isPaused = status === 'paused';
 
+  const effectiveListening = isListeningExternal !== undefined ? isListeningExternal : isListening;
+
   const toggleTab = (tabName) => {
     setActiveSheetTab((prev) => (prev === tabName ? null : tabName));
   };
 
   const handleToggleMic = (e) => {
     if (e && e.stopPropagation) e.stopPropagation();
-    if (isListening) {
+    if (effectiveListening || speechInput.activeMode) {
+      speechInput.setActiveConversationMode(false);
       speechInput.stopListening();
       setIsListening(false);
     } else {
-      setHeardText('Listening for command...');
+      speechInput.setActiveConversationMode(true);
+      setHeardText('Voice Assistant active... listening');
       const started = speechInput.startListening(
         ({ transcript, command }) => {
-          setIsListening(false);
           setHeardText(`Heard: "${transcript}"`);
           if (onVoiceCommand) {
             onVoiceCommand(command, transcript);
@@ -302,18 +306,18 @@ export function MobileBottomCockpit({
       <div className="mobile-guidance-bar">
         <button
           type="button"
-          className={`mobile-voice-mic-btn ${isListening ? 'listening animate-pulse' : ''}`}
+          className={`mobile-voice-mic-btn ${effectiveListening ? 'listening animate-pulse' : ''}`}
           onClick={handleToggleMic}
-          title={isListening ? 'Listening... tap to stop' : 'Tap to speak voice command'}
+          title={effectiveListening ? 'Voice Assistant active (listening)... tap to pause' : 'Tap to speak voice command'}
           aria-label="Voice Command Microphone"
         >
-          {isListening ? <MicOff size={18} /> : <Mic size={18} />}
-          {isListening && <span className="mobile-mic-ping" />}
+          {effectiveListening ? <MicOff size={18} /> : <Mic size={18} />}
+          {effectiveListening && <span className="mobile-mic-ping" />}
         </button>
 
         <div className="mobile-guidance-text-box" onClick={() => toggleTab('voice')}>
-          <p className={`mobile-guidance-text truncate ${isListening ? 'text-cyan-300 font-semibold' : ''}`}>
-            {heardText || guidanceText || 'Tap mic to speak voice command (e.g. "Go to Library")'}
+          <p className={`mobile-guidance-text truncate ${effectiveListening ? 'text-cyan-300 font-semibold' : ''}`}>
+            {heardText || guidanceText || 'Voice Assistant active (e.g. "Hello", "Go to Library")'}
           </p>
         </div>
 

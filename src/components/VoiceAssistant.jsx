@@ -16,7 +16,8 @@ export function VoiceAssistant({
   currentLanguage = 'en',
   guidanceText,
   status = 'idle',
-  currentDestination
+  currentDestination,
+  isListeningExternal
 }) {
   const uiTexts = LANGUAGE_UI_TEXTS[currentLanguage] || LANGUAGE_UI_TEXTS.en;
   const currentLangObj = SUPPORTED_LANGUAGES.find(l => l.code === currentLanguage) || SUPPORTED_LANGUAGES[0];
@@ -25,6 +26,8 @@ export function VoiceAssistant({
   const [showQuickPhrases, setShowQuickPhrases] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const isSupported = speechInput.isSupported();
+
+  const effectiveListening = isListeningExternal !== undefined ? isListeningExternal : isListening;
 
   // Reference image text fallback
   const defaultGuidance = uiTexts.speech?.obstacleDetected
@@ -40,12 +43,14 @@ export function VoiceAssistant({
       return;
     }
 
-    if (isListening) {
+    if (effectiveListening || speechInput.activeMode) {
+      speechInput.setActiveConversationMode(false);
       speechInput.stopListening();
       setIsListening(false);
     } else {
       setErrorMessage('');
       setTranscript('Listening for voice command...');
+      speechInput.setActiveConversationMode(true);
       const started = speechInput.startListening(
         ({ transcript: heardText, command }) => {
           setTranscript(`"${heardText}"`);
@@ -54,7 +59,7 @@ export function VoiceAssistant({
           }
         },
         ({ state }) => {
-          setIsListening(state === 'listening');
+          setIsListening(state === 'listening' || state === 'speaking' || state === 'processing');
         },
         (error) => {
           setIsListening(false);
@@ -87,6 +92,14 @@ export function VoiceAssistant({
         <span className="hud-card-title flex items-center gap-1.5">
           <Sparkles size={13} className="text-blue-400" />
           Voice Assistant
+          <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-mono font-medium ${
+            effectiveListening
+              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+              : 'bg-slate-700/50 text-slate-400'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${effectiveListening ? 'bg-emerald-400 animate-ping' : 'bg-slate-500'}`} />
+            {effectiveListening ? 'ACTIVE' : 'READY'}
+          </span>
         </span>
         <div className="flex items-center gap-1.5">
           <button
@@ -113,11 +126,11 @@ export function VoiceAssistant({
         <div className="voice-mic-column">
           <button
             type="button"
-            className={`voice-circle-mic-btn ${isListening ? 'listening' : ''}`}
+            className={`voice-circle-mic-btn ${effectiveListening ? 'listening' : ''}`}
             onClick={handleToggleListen}
-            title={isListening ? 'Stop listening' : 'Click to speak or listen'}
+            title={effectiveListening ? 'Active conversation (listening)... Tap to pause' : 'Tap to activate voice assistant'}
           >
-            {isListening ? (
+            {effectiveListening ? (
               <MicOff size={24} color="#ffffff" />
             ) : (
               <Mic size={24} color="#ffffff" />

@@ -1,6 +1,5 @@
 import React from 'react';
 import { 
-  Menu, 
   MapPin, 
   Volume2, 
   VolumeX, 
@@ -20,7 +19,6 @@ export function MobileTopBar({
   onSelectLanguage,
   isMuted,
   onToggleMute,
-  onOpenDrawer,
   onOpenDestinations,
   onOpenHelp,
   distanceLeft
@@ -63,17 +61,8 @@ export function MobileTopBar({
 
   return (
     <header className="mobile-top-bar">
-      {/* Left: Hamburger menu + Brand Logo */}
+      {/* Left: Brand Logo & Status */}
       <div className="flex items-center gap-2">
-        <button
-          type="button"
-          className="mobile-icon-btn mobile-drawer-btn"
-          onClick={onOpenDrawer}
-          aria-label="Open Navigation Menu"
-          title="Open Menu"
-        >
-          <Menu size={20} />
-        </button>
 
         <div className="mobile-brand-wrapper">
           <div className="mobile-brand-disc">

@@ -8,6 +8,8 @@ export class SpeechInputEngine {
 
     this.recognition = SpeechRecognition ? new SpeechRecognition() : null;
     this.isListening = false;
+    this.activeMode = false;
+    this.isSpeakingPaused = false;
     this.currentLang = 'en';
     this.onResultCallback = null;
     this.onStateChangeCallback = null;
@@ -26,6 +28,17 @@ export class SpeechInputEngine {
       this.recognition.onend = () => {
         this.isListening = false;
         this.notifyState('idle');
+        if (this.activeMode && !this.isSpeakingPaused) {
+          setTimeout(() => {
+            if (this.activeMode && !this.isListening && !this.isSpeakingPaused) {
+              try {
+                this.recognition.start();
+              } catch {
+                // Ignore restart conflict
+              }
+            }
+          }, 400);
+        }
       };
 
       this.recognition.onerror = (event) => {
@@ -104,6 +117,19 @@ export class SpeechInputEngine {
         if (this.onResultCallback) {
           this.onResultCallback({ transcript, command });
         }
+        if (this.activeMode && !this.isSpeakingPaused) {
+          setTimeout(() => {
+            if (this.activeMode && !this.isListening && !this.isSpeakingPaused) {
+              try {
+                window.AndroidNativeSpeech.startListening(langTag);
+                this.isListening = true;
+                this.notifyState('listening');
+              } catch {
+                // ignore
+              }
+            }
+          }, 600);
+        }
       };
 
       window.onAndroidSpeechPartialResult = (partialText) => {
@@ -122,6 +148,19 @@ export class SpeechInputEngine {
         this.notifyState('error', errorMsg);
         if (this.onErrorCallback) {
           this.onErrorCallback(errorMsg);
+        }
+        if (this.activeMode && !this.isSpeakingPaused) {
+          setTimeout(() => {
+            if (this.activeMode && !this.isListening && !this.isSpeakingPaused) {
+              try {
+                window.AndroidNativeSpeech.startListening(langTag);
+                this.isListening = true;
+                this.notifyState('listening');
+              } catch {
+                // ignore
+              }
+            }
+          }, 600);
         }
       };
 
@@ -172,6 +211,36 @@ export class SpeechInputEngine {
     }
   }
 
+  setActiveConversationMode(enabled, onResult, onStateChange, onError) {
+    this.activeMode = Boolean(enabled);
+    if (onResult) this.onResultCallback = onResult;
+    if (onStateChange) this.onStateChangeCallback = onStateChange;
+    if (onError) this.onErrorCallback = onError;
+
+    if (this.activeMode) {
+      this.startListening(this.onResultCallback, this.onStateChangeCallback, this.onErrorCallback);
+    } else {
+      this.stopListening();
+    }
+  }
+
+  pauseForSpeech(isSpeaking) {
+    this.isSpeakingPaused = Boolean(isSpeaking);
+    if (isSpeaking) {
+      if (this.isListening) {
+        this.stopListening();
+      }
+    } else {
+      if (this.activeMode && !this.isListening) {
+        setTimeout(() => {
+          if (this.activeMode && !this.isListening && !this.isSpeakingPaused) {
+            this.startListening(this.onResultCallback, this.onStateChangeCallback, this.onErrorCallback);
+          }
+        }, 400);
+      }
+    }
+  }
+
   parseCommand(text) {
     if (!text) return { type: 'UNKNOWN', raw: '' };
 
@@ -199,6 +268,20 @@ export class SpeechInputEngine {
       steps = 4;
     } else if (clean.includes('five') || clean.includes('ఐదు') || clean.includes('पाँच') || clean.includes('അഞ്ച്') || clean.includes('ஐந்து') || clean.includes('ಐದು')) {
       steps = 5;
+    }
+
+    // 1. Conversational Queries & Greetings (multilingual)
+    if (MULTILINGUAL_DICTIONARY.conversational?.greeting.some(k => clean.includes(k.toLowerCase()))) {
+      return { type: 'GREETING', raw: text };
+    }
+    if (MULTILINGUAL_DICTIONARY.conversational?.status.some(k => clean.includes(k.toLowerCase()))) {
+      return { type: 'STATUS_QUERY', raw: text };
+    }
+    if (MULTILINGUAL_DICTIONARY.conversational?.identity.some(k => clean.includes(k.toLowerCase()))) {
+      return { type: 'IDENTITY_QUERY', raw: text };
+    }
+    if (MULTILINGUAL_DICTIONARY.conversational?.help.some(k => clean.includes(k.toLowerCase()))) {
+      return { type: 'HELP_QUERY', raw: text };
     }
 
     // 2. Clear / Remove Obstacles (multilingual)
