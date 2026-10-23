@@ -73,7 +73,7 @@ export function App() {
   const [activeTab, setActiveTab] = useState('map');
   const [cameraMode, setCameraMode] = useState('perspective');
   const [guidanceText, setGuidanceText] = useState(
-    'System ready at Origin Dock.\nSelect a destination or give voice command (e.g. "Go to Library").'
+    'Listening for commands (e.g. "Go to Library", "Move forward", "Turn left")...'
   );
 
   const lastActionTimestampRef = useRef(0);
@@ -412,12 +412,11 @@ export function App() {
     );
 
     if (nextActive) {
-      const greeting = speechOutput.speakGreeting();
-      setGuidanceText(greeting);
+      setGuidanceText('Listening for commands (e.g. "Go to Library", "Move forward")...');
     }
   }, [isVoiceListening, currentLanguage, handleVoiceCommand]);
 
-  // Auto-activate voice assistant on load so it stays active and converses continuously
+  // Auto-activate voice listening on load without speaking any precommand
   useEffect(() => {
     speechInput.setLanguage(currentLanguage);
     const activate = () => {
@@ -438,14 +437,6 @@ export function App() {
 
     activate();
 
-    // Directly speak greeting and initialize voice allowance immediately on app startup
-    const greetingTimer = setTimeout(() => {
-      const greeting = speechOutput.speakGreeting();
-      if (greeting) {
-        setGuidanceText(greeting);
-      }
-    }, 700);
-
     const handleUserGesture = () => {
       if (!speechInput.activeMode) {
         activate();
@@ -458,7 +449,6 @@ export function App() {
     window.addEventListener('touchstart', handleUserGesture);
 
     return () => {
-      clearTimeout(greetingTimer);
       window.removeEventListener('click', handleUserGesture);
       window.removeEventListener('touchstart', handleUserGesture);
     };
