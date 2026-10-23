@@ -73,7 +73,7 @@ export function App() {
   const [activeTab, setActiveTab] = useState('map');
   const [cameraMode, setCameraMode] = useState('perspective');
   const [guidanceText, setGuidanceText] = useState(
-    'Listening for commands (e.g. "Go to Library", "Move forward", "Turn left")...'
+    'Listening for your voice commands...'
   );
 
   // Location and metrics computed early so callbacks and voice commands have immediate access
@@ -424,7 +424,7 @@ export function App() {
     );
 
     if (nextActive) {
-      setGuidanceText('Listening for commands (e.g. "Go to Library", "Move forward")...');
+      setGuidanceText('Listening for your voice commands...');
     }
   }, [isVoiceListening, currentLanguage, handleVoiceCommand]);
 

@@ -119,6 +119,9 @@ class SpeechOutputEngine {
         if (this.onSpeechEnd) this.onSpeechEnd();
       };
 
+      if (this.synth.paused) {
+        this.synth.resume();
+      }
       this.synth.speak(utterance);
     } catch (err) {
       console.warn('Speech synthesis error or blocked by browser policy:', err);

@@ -317,7 +317,7 @@ export function MobileBottomCockpit({
 
         <div className="mobile-guidance-text-box" onClick={() => toggleTab('voice')}>
           <p className={`mobile-guidance-text truncate ${effectiveListening ? 'text-cyan-300 font-semibold' : ''}`}>
-            {heardText || guidanceText || 'Voice Assistant active (e.g. "Hello", "Go to Library")'}
+            {heardText || guidanceText || 'Listening for your voice commands...'}
           </p>
         </div>
 

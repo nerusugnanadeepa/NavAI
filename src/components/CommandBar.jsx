@@ -13,7 +13,7 @@ export function CommandBar({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    const query = commandText.trim() || uiTexts.quickPhrases[0];
+    const query = commandText.trim();
     if (query && onExecuteCommand) {
       onExecuteCommand(query);
       setCommandText('');
