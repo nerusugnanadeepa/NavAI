@@ -76,6 +76,18 @@ export function App() {
     'Listening for commands (e.g. "Go to Library", "Move forward", "Turn left")...'
   );
 
+  // Location and metrics computed early so callbacks and voice commands have immediate access
+  const locDescription = getLocationDescription ? getLocationDescription() : 'Near Cafeteria';
+  const targetWorld = currentDestination?.worldPos;
+  const curWorld = robotPosition?.world || { x: -5, z: 5.5 };
+  const distMeters = (status === 'arrived' || !targetWorld)
+    ? 0
+    : Math.max(0, Math.round(Math.hypot(targetWorld.x - curWorld.x, targetWorld.z - curWorld.z) * 1.5));
+  const distanceLeft = currentDestination ? `${distMeters} m` : '0 m';
+  const speedStr = (status === 'moving' || status === 'avoiding_obstacle')
+    ? `${(speed * 0.8).toFixed(1)} m/s`
+    : '0.0 m/s';
+
   const lastActionTimestampRef = useRef(0);
 
   // Sync Voice guidance & announcements with real-time simulation actions & movements
@@ -459,18 +471,6 @@ export function App() {
     setIsMuted(next);
     speechOutput.setMuted(next);
   };
-
-  // Location and metrics (Bug 3.4 Fix: do not fallback to Library when destination is null)
-  const locDescription = getLocationDescription ? getLocationDescription() : 'Near Cafeteria';
-  const targetWorld = currentDestination?.worldPos;
-  const curWorld = robotPosition?.world || { x: -5, z: 5.5 };
-  const distMeters = (status === 'arrived' || !targetWorld)
-    ? 0
-    : Math.max(0, Math.round(Math.hypot(targetWorld.x - curWorld.x, targetWorld.z - curWorld.z) * 1.5));
-  const distanceLeft = currentDestination ? `${distMeters} m` : '0 m';
-  const speedStr = (status === 'moving' || status === 'avoiding_obstacle')
-    ? `${(speed * 0.8).toFixed(1)} m/s`
-    : '0.0 m/s';
 
   return (
     <div className="hud-fullscreen-wrapper">
