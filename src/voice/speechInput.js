@@ -62,9 +62,11 @@ export class SpeechInputEngine {
       window.onAndroidMicPermissionResult = (granted) => {
         if (granted) {
           this.notifyState('idle');
-          if (this.pendingStartListening) {
+          if (this.pendingStartListening || this.activeMode) {
             this.pendingStartListening = false;
-            this.startListening(this.onResultCallback, this.onStateChangeCallback, this.onErrorCallback);
+            if (!this.isListening && !this.isSpeakingPaused) {
+              this.startListening(this.onResultCallback, this.onStateChangeCallback, this.onErrorCallback);
+            }
           }
         } else {
           this.isListening = false;

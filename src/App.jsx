@@ -438,6 +438,14 @@ export function App() {
 
     activate();
 
+    // Directly speak greeting and initialize voice allowance immediately on app startup
+    const greetingTimer = setTimeout(() => {
+      const greeting = speechOutput.speakGreeting();
+      if (greeting) {
+        setGuidanceText(greeting);
+      }
+    }, 700);
+
     const handleUserGesture = () => {
       if (!speechInput.activeMode) {
         activate();
@@ -450,6 +458,7 @@ export function App() {
     window.addEventListener('touchstart', handleUserGesture);
 
     return () => {
+      clearTimeout(greetingTimer);
       window.removeEventListener('click', handleUserGesture);
       window.removeEventListener('touchstart', handleUserGesture);
     };

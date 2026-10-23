@@ -17,6 +17,15 @@ class SpeechOutputEngine {
         window.speechSynthesis.onvoiceschanged = () => this.initVoice();
       }
     }
+
+    if (typeof window !== 'undefined') {
+      window.onAndroidTtsStart = () => {
+        if (this.onSpeechStart) this.onSpeechStart();
+      };
+      window.onAndroidTtsEnd = () => {
+        if (this.onSpeechEnd) this.onSpeechEnd();
+      };
+    }
   }
 
   setLanguage(langCode) {
@@ -41,13 +50,21 @@ class SpeechOutputEngine {
   }
 
   isSupported() {
+    if (typeof window !== 'undefined' && window.AndroidNativeSpeech && typeof window.AndroidNativeSpeech.speak === 'function') {
+      return true;
+    }
     return Boolean(this.synth);
   }
 
   setMuted(muted) {
     this.isMuted = muted;
-    if (muted && this.synth) {
-      this.synth.cancel();
+    if (muted) {
+      if (this.synth) {
+        this.synth.cancel();
+      }
+      if (typeof window !== 'undefined' && window.AndroidNativeSpeech && typeof window.AndroidNativeSpeech.stopSpeaking === 'function') {
+        window.AndroidNativeSpeech.stopSpeaking();
+      }
     }
   }
 
@@ -60,7 +77,25 @@ class SpeechOutputEngine {
   }
 
   speak(text, priority = false) {
-    if (!this.synth || this.isMuted || !text) return;
+    if (this.isMuted || !text) return;
+
+    // 1. Direct Native Android TTS (No browser autoplay block, direct device speaker output)
+    if (typeof window !== 'undefined' && window.AndroidNativeSpeech && typeof window.AndroidNativeSpeech.speak === 'function') {
+      try {
+        if (priority && typeof window.AndroidNativeSpeech.stopSpeaking === 'function') {
+          window.AndroidNativeSpeech.stopSpeaking();
+        }
+        const langObj = SUPPORTED_LANGUAGES.find(l => l.code === this.currentLang) || SUPPORTED_LANGUAGES[0];
+        const langTag = langObj ? langObj.langTag : 'en-US';
+        if (this.onSpeechStart) this.onSpeechStart();
+        window.AndroidNativeSpeech.speak(text, langTag);
+        return;
+      } catch (err) {
+        console.warn('Native Android TTS error, falling back to Web Speech API:', err);
+      }
+    }
+
+    if (!this.synth) return;
 
     try {
       if (priority) {

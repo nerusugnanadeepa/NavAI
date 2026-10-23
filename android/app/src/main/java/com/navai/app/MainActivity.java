@@ -10,23 +10,32 @@ import android.speech.SpeechRecognizer;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.WebView;
+import android.speech.tts.TextToSpeech;
+import android.speech.tts.UtteranceProgressListener;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 import com.getcapacitor.BridgeWebChromeClient;
 import java.util.ArrayList;
+import java.util.Locale;
 
-public class MainActivity extends BridgeActivity {
+public class MainActivity extends BridgeActivity implements TextToSpeech.OnInitListener {
     private static final int PERMISSION_REQUEST_RECORD_AUDIO = 2001;
     private SpeechRecognizer speechRecognizer;
+    private TextToSpeech textToSpeech;
+    private boolean isTtsReady = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
+        initTts();
+
         // Check & request runtime microphone permission
-        checkMicPermission();
+        if (checkMicPermission()) {
+            notifyMicPermissionGranted();
+        }
 
         // Setup custom WebChromeClient on Capacitor's WebView to grant audio capture
         if (bridge != null && bridge.getWebView() != null) {
@@ -44,6 +53,46 @@ public class MainActivity extends BridgeActivity {
 
             // Register native Speech Recognizer bridge for JavaScript
             webView.addJavascriptInterface(new AndroidSpeechInterface(), "AndroidNativeSpeech");
+        }
+    }
+
+    private void initTts() {
+        try {
+            textToSpeech = new TextToSpeech(this, this);
+        } catch (Exception ignored) {}
+    }
+
+    @Override
+    public void onInit(int status) {
+        if (status == TextToSpeech.SUCCESS && textToSpeech != null) {
+            isTtsReady = true;
+            try {
+                textToSpeech.setLanguage(Locale.US);
+                textToSpeech.setOnUtteranceProgressListener(new UtteranceProgressListener() {
+                    @Override
+                    public void onStart(String utteranceId) {
+                        evaluateJs("if (window.onAndroidTtsStart) { window.onAndroidTtsStart(); }");
+                    }
+
+                    @Override
+                    public void onDone(String utteranceId) {
+                        evaluateJs("if (window.onAndroidTtsEnd) { window.onAndroidTtsEnd(); }");
+                    }
+
+                    @Override
+                    public void onError(String utteranceId) {
+                        evaluateJs("if (window.onAndroidTtsEnd) { window.onAndroidTtsEnd(); }");
+                    }
+                });
+            } catch (Exception ignored) {}
+        }
+    }
+
+    private void notifyMicPermissionGranted() {
+        if (bridge != null && bridge.getWebView() != null) {
+            bridge.getWebView().postDelayed(() -> {
+                evaluateJs("if (window.onAndroidMicPermissionResult) { window.onAndroidMicPermissionResult(true); }");
+            }, 600);
         }
     }
 
@@ -198,6 +247,51 @@ public class MainActivity extends BridgeActivity {
                 evaluateJs("window.onAndroidSpeechState('idle')");
             });
         }
+
+        @JavascriptInterface
+        public void speak(final String text, final String langTag) {
+            if (text == null || text.trim().isEmpty()) {
+                evaluateJs("if (window.onAndroidTtsEnd) { window.onAndroidTtsEnd(); }");
+                return;
+            }
+            runOnUiThread(() -> {
+                if (textToSpeech != null && isTtsReady) {
+                    try {
+                        if (langTag != null && !langTag.trim().isEmpty()) {
+                            Locale loc = Locale.forLanguageTag(langTag.trim());
+                            int result = textToSpeech.setLanguage(loc);
+                            if (result == TextToSpeech.LANG_MISSING_DATA || result == TextToSpeech.LANG_NOT_SUPPORTED) {
+                                textToSpeech.setLanguage(Locale.US);
+                            }
+                        }
+                        Bundle params = new Bundle();
+                        params.putString(TextToSpeech.Engine.KEY_PARAM_UTTERANCE_ID, "NAVAI_TTS_" + System.currentTimeMillis());
+                        textToSpeech.speak(text, TextToSpeech.QUEUE_FLUSH, params, "NAVAI_TTS_" + System.currentTimeMillis());
+                    } catch (Exception e) {
+                        evaluateJs("if (window.onAndroidTtsEnd) { window.onAndroidTtsEnd(); }");
+                    }
+                } else {
+                    evaluateJs("if (window.onAndroidTtsEnd) { window.onAndroidTtsEnd(); }");
+                }
+            });
+        }
+
+        @JavascriptInterface
+        public void stopSpeaking() {
+            runOnUiThread(() -> {
+                if (textToSpeech != null) {
+                    try {
+                        textToSpeech.stop();
+                    } catch (Exception ignored) {}
+                }
+                evaluateJs("if (window.onAndroidTtsEnd) { window.onAndroidTtsEnd(); }");
+            });
+        }
+
+        @JavascriptInterface
+        public boolean isSpeaking() {
+            return textToSpeech != null && textToSpeech.isSpeaking();
+        }
     }
 
     private void evaluateJs(final String jsCode) {
@@ -243,6 +337,13 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onDestroy() {
+        if (textToSpeech != null) {
+            try {
+                textToSpeech.stop();
+                textToSpeech.shutdown();
+            } catch (Exception ignored) {}
+            textToSpeech = null;
+        }
         if (speechRecognizer != null) {
             speechRecognizer.destroy();
             speechRecognizer = null;

@@ -41,10 +41,13 @@
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
     <uses-feature android:name="android.hardware.microphone" android:required="false" />
 
-    <!-- Queries for Android 11+ Speech Recognition Service Visibility -->
+    <!-- Queries for Android 11+ Speech Recognition & TextToSpeech Service Visibility -->
     <queries>
         <intent>
             <action android:name="android.speech.RecognitionService" />
+        </intent>
+        <intent>
+            <action android:name="android.intent.action.TTS_SERVICE" />
         </intent>
     </queries>
 </manifest>
